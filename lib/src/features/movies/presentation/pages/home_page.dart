@@ -5,15 +5,16 @@ import 'package:mtv_app/src/features/movies/presentation/bloc/movie_event.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_state.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
 import 'package:mtv_app/src/features/settings/presentation/pages/settings_page.dart';
+import 'package:mtv_app/src/core/widgets/language_selector.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class MoviesPage extends StatefulWidget {
+  const MoviesPage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<MoviesPage> createState() => _MoviesPageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _MoviesPageState extends State<MoviesPage> {
   @override
   void initState() {
     super.initState();
@@ -26,6 +27,7 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)?.popularMovies ?? 'Popular Movies'),
         actions: [
+          const LanguageSelector(),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {

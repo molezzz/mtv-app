@@ -186,6 +186,76 @@ class AppLocalizations {
         return 'Login successful! Settings saved.';
     }
   }
+
+  String get movies {
+    switch (localeName) {
+      case 'zh':
+        return '电影';
+      case 'en':
+      default:
+        return 'Movies';
+    }
+  }
+
+  String get tvShows {
+    switch (localeName) {
+      case 'zh':
+        return '剧集';
+      case 'en':
+      default:
+        return 'TV Shows';
+    }
+  }
+
+  String get records {
+    switch (localeName) {
+      case 'zh':
+        return '记录';
+      case 'en':
+      default:
+        return 'Records';
+    }
+  }
+
+  String get favorites {
+    switch (localeName) {
+      case 'zh':
+        return '收藏';
+      case 'en':
+      default:
+        return 'Favorites';
+    }
+  }
+
+  String get comingSoon {
+    switch (localeName) {
+      case 'zh':
+        return '即将推出';
+      case 'en':
+      default:
+        return 'Coming Soon';
+    }
+  }
+
+  String get watchHistory {
+    switch (localeName) {
+      case 'zh':
+        return '观看历史';
+      case 'en':
+      default:
+        return 'Watch History';
+    }
+  }
+
+  String get yourFavoriteContent {
+    switch (localeName) {
+      case 'zh':
+        return '您收藏的内容';
+      case 'en':
+      default:
+        return 'Your Favorite Content';
+    }
+  }
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -6,7 +6,7 @@ import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_s
 import 'package:mtv_app/src/features/movies/data/repositories/movie_repository_impl.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
-import 'package:mtv_app/src/features/movies/presentation/pages/home_page.dart';
+import 'package:mtv_app/src/core/navigation/main_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
@@ -144,7 +144,7 @@ class _AppState extends State<App> {
                       ),
                     ),
                   ),
-                  child: const HomePage(),
+                  child: const MainPage(),
                 );
               },
             ),
