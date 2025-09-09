@@ -51,6 +51,17 @@ android {
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        
+        // 视频播放器优化配置
+        multiDexEnabled true
+        
+        // ExoPlayer配置
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 硬件解码优化
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
     }
 
     buildTypes {
@@ -68,6 +79,25 @@ dependencies {
     implementation 'androidx.mediarouter:mediarouter:1.7.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
+    
+    // ExoPlayer dependencies for enhanced HLS/M3U8 support
+    implementation 'androidx.media3:media3-exoplayer:1.2.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.2.1'
+    implementation 'androidx.media3:media3-ui:1.2.1'
+    implementation 'androidx.media3:media3-common:1.2.1'
+    
+    // Additional video format support
+    implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
+    implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.2.1'
+    
+    // 视频播放器增强支持和硬件解码优化
+    implementation 'androidx.multidex:multidex:2.0.1'
+    implementation 'androidx.media3:media3-decoder:1.2.1'
+    implementation 'androidx.media3:media3-datasource:1.2.1'
+    implementation 'androidx.media3:media3-extractor:1.2.1'
+    
+    // 硬件加速支持
+    implementation 'androidx.media3:media3-session:1.2.1'
 }
 
 flutter {

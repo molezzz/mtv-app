@@ -1,8 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
@@ -12,7 +11,7 @@ import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video_detail.dart';
 import 'package:mtv_app/src/core/services/cast_service.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtv_app/src/features/movies/presentation/widgets/video_player_widget.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoSource;
@@ -37,8 +36,8 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  VideoPlayerController? _videoPlayerController;
-  ChewieController? _chewieController;
+  final CustomVideoPlayerController _playerController =
+      CustomVideoPlayerController();
   bool _isLoading = true;
   bool _hasError = false;
   String? _errorMessage;
@@ -51,6 +50,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _isControlsVisible = true;
   bool _isCasting = false;
   String? _currentVideoUrl;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  bool _isPlaying = false;
+  bool _isFullScreen = true; // 默认全屏
+  double _volume = 1.0; // 默认音量
+  Timer? _hideControlsTimer; // 控制栏自动隐藏计时器
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
@@ -68,10 +73,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     _disposeControllers();
+    _hideControlsTimer?.cancel(); // 取消计时器
     _setScreenToPortrait();
     WakelockPlus.disable(); // 恢复屏幕锁定
     // 只在移动平台停止设备发现
-    if (defaultTargetPlatform == TargetPlatform.android || 
+    if (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS) {
       CastService.stopDiscovery();
     }
@@ -97,14 +103,82 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _disposeControllers() {
-    _chewieController?.dispose();
-    _videoPlayerController?.dispose();
+    // AliPlayer会在AliPlayerWidget的dispose方法中自动销毁
+  }
+
+  // 控制栏显示/隐藏方法
+  void _toggleControls() {
+    setState(() {
+      _isControlsVisible = !_isControlsVisible;
+    });
+    _resetHideControlsTimer();
+  }
+
+  void _showControls() {
+    setState(() {
+      _isControlsVisible = true;
+    });
+    _resetHideControlsTimer();
+  }
+
+  void _hideControls() {
+    setState(() {
+      _isControlsVisible = false;
+    });
+  }
+
+  void _resetHideControlsTimer() {
+    _hideControlsTimer?.cancel();
+    if (_isControlsVisible) {
+      _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) {
+          _hideControls();
+        }
+      });
+    }
+  }
+
+  // 播放控制方法
+  void _togglePlayPause() {
+    if (_isPlaying) {
+      _playerController.pause();
+    } else {
+      _playerController.play();
+    }
+    _showControls();
+  }
+
+  void _onSeekChanged(double value) {
+    final newPosition =
+        Duration(milliseconds: (value * _duration.inMilliseconds).round());
+    _playerController.seekTo(newPosition);
+    _showControls();
+  }
+
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+    if (_isFullScreen) {
+      _setScreenToLandscape();
+    } else {
+      _setScreenToPortrait();
+    }
+    _showControls();
+  }
+
+  void _adjustVolume(double delta) {
+    setState(() {
+      _volume = (_volume + delta).clamp(0.0, 1.0);
+    });
+    _playerController.setVolume(_volume);
+    _showControls();
   }
 
   Future<void> _checkCastingStatus() async {
     try {
       // 只在移动平台检查投屏状态
-      if (defaultTargetPlatform == TargetPlatform.android || 
+      if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) {
         final isConnected = await CastService.isConnected();
         setState(() {
@@ -134,7 +208,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     try {
       // 首先获取视频详情
       await _fetchVideoDetail();
-      
+
       // 如果有传入特定的episodeUrl，直接使用
       if (widget.episodeUrl != null && widget.episodeUrl!.isNotEmpty) {
         await _playVideoFromUrl(widget.episodeUrl!);
@@ -157,16 +231,39 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final currentSource = _videoSources != null && _videoSources!.isNotEmpty
         ? _videoSources![_currentSourceIndex]
         : null;
-    
+
+    print('\n=== 获取视频详情调试 ===');
+    print('当前选中的源索引: $_currentSourceIndex');
+    print('源总数量: ${_videoSources?.length ?? 0}');
+    print('当前源信息: $currentSource');
+    print('Widget传入参数:');
+    print('  - videoSource: ${widget.videoSource}');
+    print('  - videoId: ${widget.videoId}');
+    print('  - episodeUrl: ${widget.episodeUrl}');
+    print('===========================\n');
+
     if (currentSource != null) {
       // 使用当前选中的视频源信息
-      context.read<MovieBloc>().add(
-        GetVideoDetailEvent(currentSource.source ?? widget.videoSource, currentSource.id),
-      );
+      final source = currentSource.source ?? widget.videoSource;
+      final id = currentSource.id;
+      print('使用当前源信息: source=$source, id=$id');
       
+      context.read<MovieBloc>().add(
+            GetVideoDetailEvent(source, id),
+          );
+
       // 监听状态变化
       await for (final state in context.read<MovieBloc>().stream) {
         if (state is VideoDetailLoaded) {
+          print('\n=== 视频详情加载成功 ===');
+          print('视频标题: ${state.videoDetail.title}');
+          print('剧集数量: ${state.videoDetail.episodes?.length ?? 0}');
+          print('剧集列表:');
+          for (int i = 0; i < (state.videoDetail.episodes?.length ?? 0); i++) {
+            print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
+          }
+          print('=========================\n');
+          
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -178,12 +275,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       }
     } else {
       // 使用传入的参数
-      context.read<MovieBloc>().add(
-        GetVideoDetailEvent(widget.videoSource, widget.videoId),
-      );
+      print('使用Widget传入参数: source=${widget.videoSource}, id=${widget.videoId}');
       
+      context.read<MovieBloc>().add(
+            GetVideoDetailEvent(widget.videoSource, widget.videoId),
+          );
+
       await for (final state in context.read<MovieBloc>().stream) {
         if (state is VideoDetailLoaded) {
+          print('\n=== 视频详情加载成功 ===');
+          print('视频标题: ${state.videoDetail.title}');
+          print('剧集数量: ${state.videoDetail.episodes?.length ?? 0}');
+          print('剧集列表:');
+          for (int i = 0; i < (state.videoDetail.episodes?.length ?? 0); i++) {
+            print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
+          }
+          print('=========================\n');
+          
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -200,63 +308,32 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     try {
       _disposeControllers();
 
-      // 使用示例视频URL进行测试
-      // 实际项目中需要从 episodes 中解析出实际的播放链接
-      const testVideoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+      // 添加调试日志：检查传入的视频URL
+      print('\n=== 播放视频URL调试 ===');
+      print('传入的videoUrl: $videoUrl');
+      print('当前选择的剧集索引: $_currentEpisodeIndex');
+      print('总剧集数量: ${_episodes.length}');
       
-      _currentVideoUrl = testVideoUrl; // 保存当前播放URL
-      _videoPlayerController = VideoPlayerController.networkUrl(
-        Uri.parse(testVideoUrl),
-      );
+      // 验证URL有效性
+      if (videoUrl.isEmpty) {
+        throw Exception('视频URL为空');
+      }
+      
+      if (!videoUrl.startsWith('http')) {
+        throw Exception('无效的视频URL格式: $videoUrl');
+      }
+      
+      print('使用实际播放地址: $videoUrl');
+      print('======================\n');
 
-      await _videoPlayerController!.initialize();
-
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController!,
-        autoPlay: true,
-        looping: false,
-        allowFullScreen: false, // 已经是全屏模式
-        allowMuting: true,
-        showControls: true,
-        playbackSpeeds: _playbackSpeeds,
-        placeholder: Container(
-          color: Colors.black,
-          child: const Center(
-            child: CircularProgressIndicator(color: Colors.orange),
-          ),
-        ),
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error,
-                  color: Colors.red,
-                  size: 60,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '播放出错',
-                  style: TextStyle(color: Colors.white, fontSize: 20),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  errorMessage,
-                  style: const TextStyle(color: Colors.grey, fontSize: 14),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        },
-      );
+      _currentVideoUrl = videoUrl; // 保存当前播放URL
 
       setState(() {
         _isLoading = false;
         _hasError = false;
       });
     } catch (e) {
+      print('播放视频URL处理失败: $e');
       setState(() {
         _hasError = true;
         _errorMessage = '播放器初始化失败: ${e.toString()}';
@@ -275,7 +352,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _switchVideoSource(int sourceIndex) {
-    if (_videoSources != null && sourceIndex >= 0 && sourceIndex < _videoSources!.length) {
+    if (_videoSources != null &&
+        sourceIndex >= 0 &&
+        sourceIndex < _videoSources!.length) {
       setState(() {
         _currentSourceIndex = sourceIndex;
         _currentEpisodeIndex = 0; // 重置到第一集
@@ -377,7 +456,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   final isSelected = index == _currentSourceIndex;
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: isSelected ? Colors.orange : Colors.grey[600],
+                      backgroundColor:
+                          isSelected ? Colors.orange : Colors.grey[600],
                       child: Text(
                         '${index + 1}',
                         style: const TextStyle(color: Colors.white),
@@ -387,7 +467,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       source.sourceName ?? source.source ?? '播放源${index + 1}',
                       style: TextStyle(
                         color: isSelected ? Colors.orange : Colors.white,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     subtitle: source.note != null
@@ -436,21 +517,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               final isSelected = speed == _currentPlaybackSpeed;
               return ListTile(
                 leading: Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
                   color: isSelected ? Colors.orange : Colors.grey,
                 ),
                 title: Text(
                   '${speed}x',
                   style: TextStyle(
                     color: isSelected ? Colors.orange : Colors.white,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 onTap: () {
                   setState(() {
                     _currentPlaybackSpeed = speed;
                   });
-                  _videoPlayerController?.setPlaybackSpeed(speed);
+                  // 通过AliPlayerController设置播放速度
+                  _playerController.setPlaybackSpeed(speed);
                   Navigator.pop(context);
                 },
               );
@@ -514,8 +599,47 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ],
               ),
             )
-          else if (_chewieController != null)
-            Chewie(controller: _chewieController!)
+          else if (_currentVideoUrl != null)
+            VideoPlayerWidget(
+              videoUrl: _currentVideoUrl!,
+              title: widget.title,
+              autoPlay: true,
+              showControls: false, // 使用自定义控制栏
+              playbackSpeeds: _playbackSpeeds,
+              controller: _playerController,
+              onInitialized: () {
+                setState(() {
+                  _isLoading = false;
+                  _hasError = false;
+                });
+                _resetHideControlsTimer(); // 启动控制栏自动隐藏
+              },
+              onError: (error) {
+                setState(() {
+                  _hasError = true;
+                  _errorMessage = error;
+                  _isLoading = false;
+                });
+              },
+              onPositionChanged: (position) {
+                setState(() {
+                  _position = position;
+                });
+              },
+              onDurationChanged: (duration) {
+                setState(() {
+                  _duration = duration;
+                });
+              },
+              onPlayStateChanged: (isPlaying) {
+                setState(() {
+                  _isPlaying = isPlaying;
+                });
+                if (isPlaying) {
+                  _resetHideControlsTimer(); // 播放时自动隐藏控制栏
+                }
+              },
+            )
           else
             const Center(
               child: Text(
@@ -524,67 +648,259 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
 
-          // 自定义控制栏
-          Positioned(
-            top: 40,
-            left: 16,
-            right: 16,
-            child: AnimatedOpacity(
-              opacity: _isControlsVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: Row(
-                children: [
-                  // 返回按钮
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // 标题
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // 投屏按钮
-                  IconButton(
-                    onPressed: _showCastDeviceSelector,
-                    icon: Icon(
-                      _isCasting ? Icons.cast_connected : Icons.cast,
-                      color: _isCasting ? Colors.orange : Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                ],
-              ),
+          // 点击区域控制显示/隐藏控制栏（放在控制栏下面，避免拦截按钮点击）
+          GestureDetector(
+            onTap: _toggleControls,
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: Colors.transparent,
             ),
           ),
 
-          // 底部控制栏
-          Positioned(
-            bottom: 40,
-            left: 16,
-            right: 16,
-            child: AnimatedOpacity(
-              opacity: _isControlsVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                padding: const EdgeInsets.all(12),
+          // 自定义控制栏（放在最上层，确保按钮可以点击）
+          if (_isControlsVisible) ..._buildControls(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        onPressed();
+        // 防止事件冒泡到父级的GestureDetector
+      },
+      behavior: HitTestBehavior.opaque, // 确保按钮区域可以被点击
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 构建控制栏的方法
+  List<Widget> _buildControls() {
+    return [
+      // 顶部控制栏
+      Positioned(
+        top: 40,
+        left: 16,
+        right: 16,
+        child: AnimatedOpacity(
+          opacity: _isControlsVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: Row(
+            children: [
+              // 返回按钮
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // 标题
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 全屏按钮
+              GestureDetector(
+                onTap: _toggleFullScreen,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              // 投屏按钮
+              GestureDetector(
+                onTap: _showCastDeviceSelector,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    _isCasting ? Icons.cast_connected : Icons.cast,
+                    color: _isCasting ? Colors.orange : Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      // 中间播放按钮区域（只在屏幕底部显示）
+      Positioned(
+        bottom: 120, // 放在底部控制栏上方
+        left: 0,
+        right: 0,
+        child: AnimatedOpacity(
+          opacity: _isControlsVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // 音量减
+              Container(
                 decoration: BoxDecoration(
                   color: Colors.black54,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(30),
                 ),
-                child: Row(
+                child: GestureDetector(
+                  onTap: () => _adjustVolume(-0.1),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: const Icon(
+                      Icons.volume_down,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+              // 播放/暂停按钮
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: GestureDetector(
+                  onTap: _togglePlayPause,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+              // 音量加
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: GestureDetector(
+                  onTap: () => _adjustVolume(0.1),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: const Icon(
+                      Icons.volume_up,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      // 底部控制栏
+      Positioned(
+        bottom: 20, // 降低位置，移到屏幕最底部
+        left: 16,
+        right: 16,
+        child: AnimatedOpacity(
+          opacity: _isControlsVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 进度条和时间显示
+                Row(
+                  children: [
+                    Text(
+                      _formatDuration(_position),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque, // 确保进度条可以被点击和拖动
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 8),
+                            overlayShape:
+                                const RoundSliderOverlayShape(overlayRadius: 16),
+                            activeTrackColor: Colors.orange,
+                            inactiveTrackColor: Colors.grey,
+                            thumbColor: Colors.orange,
+                          ),
+                          child: Slider(
+                            value: _duration.inMilliseconds > 0
+                                ? _position.inMilliseconds /
+                                    _duration.inMilliseconds
+                                : 0.0,
+                            onChanged: _onSeekChanged,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(_duration),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // 功能按钮行
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     // 选集按钮
@@ -607,68 +923,50 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       label: '${_currentPlaybackSpeed}x',
                       onPressed: _showSpeedSelector,
                     ),
+                    // 音量显示
+                    _buildControlButton(
+                      icon: _volume > 0.5
+                          ? Icons.volume_up
+                          : (_volume > 0
+                              ? Icons.volume_down
+                              : Icons.volume_off),
+                      label: '${(_volume * 100).round()}%',
+                      onPressed: () {},
+                    ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
-
-          // 点击区域控制显示/隐藏控制栏
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _isControlsVisible = !_isControlsVisible;
-              });
-            },
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.transparent,
-            ),
-          ),
-        ],
+        ),
       ),
-    );
+    ];
   }
 
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
+  // 时间格式化方法
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final hours = twoDigits(duration.inHours);
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+
+    if (duration.inHours > 0) {
+      return '$hours:$minutes:$seconds';
+    } else {
+      return '$minutes:$seconds';
+    }
   }
 
   void _showCastDeviceSelector() {
     // 检查平台支持
-    if (defaultTargetPlatform != TargetPlatform.android && 
+    if (defaultTargetPlatform != TargetPlatform.android &&
         defaultTargetPlatform != TargetPlatform.iOS) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('当前平台不支持投屏功能')),
       );
       return;
     }
-    
+
     if (_currentVideoUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('当前没有可投屏的视频')),
@@ -686,7 +984,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         videoUrl: _currentVideoUrl!,
         title: widget.title,
         poster: _videoDetail?.poster,
-        currentTime: _videoPlayerController?.value.position.inSeconds,
+        currentTime: _position.inSeconds,
       ),
     ).then((_) {
       // 投屏选择器关闭后，检查投屏状态

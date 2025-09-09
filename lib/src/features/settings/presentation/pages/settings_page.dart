@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/api/api_client.dart';
+import '../../../../core/auth/auth_notifier.dart';
 import '../widgets/login_dialog.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -50,7 +53,10 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final dio = Dio();
       final validationUrl = '$address/api/server-config';
-      final response = await dio.get(validationUrl, options: Options(sendTimeout: const Duration(seconds: 30), receiveTimeout: const Duration(seconds: 30)));
+      final response = await dio.get(validationUrl,
+          options: Options(
+              sendTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 30)));
       if (response.statusCode == 200) {
         isValid = true;
       }
@@ -65,7 +71,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Validation failed. Check the address or server status.')),
+        const SnackBar(
+            content:
+                Text('Validation failed. Check the address or server status.')),
       );
       return;
     }
@@ -81,12 +89,22 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 显示登录对话框
   Future<void> _showLoginDialog(String serverAddress) async {
+    // 为登录对话框创建临时的AuthNotifier
+    final apiClient = ApiClient(baseUrl: serverAddress);
+    final authNotifier = AuthNotifier(apiClient.authService);
+    await authNotifier.initialize();
+
+    if (!mounted) return;
+
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => LoginDialog(
-        serverAddress: serverAddress,
-        onLoginSuccess: () => _onLoginSuccess(serverAddress),
+      builder: (context) => ChangeNotifierProvider<AuthNotifier>.value(
+        value: authNotifier,
+        child: LoginDialog(
+          serverAddress: serverAddress,
+          onLoginSuccess: () => _onLoginSuccess(serverAddress),
+        ),
       ),
     );
   }
@@ -102,14 +120,16 @@ class _SettingsPageState extends State<SettingsPage> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)?.loginSuccessful ?? 'Login successful! Settings saved.'),
+          content: Text(AppLocalizations.of(context)?.loginSuccessful ??
+              'Login successful! Settings saved.'),
           backgroundColor: Colors.green,
         ),
       );
       widget.onSettingsSaved();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save address. Please try again.')),
+        const SnackBar(
+            content: Text('Failed to save address. Please try again.')),
       );
     }
   }
@@ -132,15 +152,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 controller: _controller,
                 style: Theme.of(context).textTheme.bodyLarge,
                 decoration: InputDecoration(
-                  labelText: AppLocalizations.of(context)?.apiServerAddress ?? 'API Server Address',
+                  labelText: AppLocalizations.of(context)?.apiServerAddress ??
+                      'API Server Address',
                   labelStyle: Theme.of(context).textTheme.bodyMedium,
                   hintText: 'e.g., http://192.168.1.100:8080',
                   hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
-                  ),
+                        color: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withOpacity(0.6),
+                      ),
                   border: const OutlineInputBorder(),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                    borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
               ),
@@ -149,7 +175,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: _saveAddress,
-                      child: Text(AppLocalizations.of(context)?.save ?? 'Validate and Save'),
+                      child: Text(AppLocalizations.of(context)?.save ??
+                          'Validate and Save'),
                     ),
             ],
           ),

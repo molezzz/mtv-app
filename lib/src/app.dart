@@ -136,7 +136,7 @@ class _AppState extends State<App> {
                 if (!authNotifier.isAuthenticated) {
                   return const _AuthRequiredScreen();
                 }
-                
+
                 // User is authenticated, show main app
                 return BlocProvider(
                   create: (context) {
@@ -199,7 +199,7 @@ class _AuthRequiredScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
-              
+
               // 登录按钮
               SizedBox(
                 width: double.infinity,
@@ -223,9 +223,9 @@ class _AuthRequiredScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // 更改服务器按钮
               SizedBox(
                 width: double.infinity,
@@ -249,9 +249,9 @@ class _AuthRequiredScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // 服务器地址显示
               FutureBuilder<String?>(
                 future: _getCurrentServerAddress(),
@@ -262,7 +262,8 @@ class _AuthRequiredScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF2C2C2C),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: Colors.amber.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -314,10 +315,9 @@ class _AuthRequiredScreen extends StatelessWidget {
 
   /// 处理登录按钮点击
   void _handleLogin(BuildContext context) async {
-    final authNotifier = Provider.of<AuthNotifier>(context, listen: false);
     final prefs = await SharedPreferences.getInstance();
     final serverAddress = prefs.getString('api_server_address');
-    
+
     if (serverAddress == null || serverAddress.isEmpty) {
       _handleChangeServer(context);
       return;
@@ -326,11 +326,14 @@ class _AuthRequiredScreen extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => LoginDialog(
-        serverAddress: serverAddress,
-        onLoginSuccess: () {
-          // 登录成功后，状态会自动更新
-        },
+      builder: (dialogContext) => Provider.value(
+        value: Provider.of<AuthNotifier>(context, listen: false),
+        child: LoginDialog(
+          serverAddress: serverAddress,
+          onLoginSuccess: () {
+            // 登录成功后，状态会自动更新
+          },
+        ),
       ),
     );
   }
@@ -339,27 +342,13 @@ class _AuthRequiredScreen extends StatelessWidget {
   void _handleChangeServer(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (context) => MaterialApp(
-          title: 'MTV App Settings',
-          theme: ThemeData.dark(),
-          localizationsDelegates: const [
-            AppLocalizationsDelegate(),
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('en', ''),
-            Locale('zh', ''),
-          ],
-          home: SettingsPage(
-            onSettingsSaved: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const AppWrapper()),
-                (route) => false,
-              );
-            },
-          ),
+        builder: (context) => SettingsPage(
+          onSettingsSaved: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const AppWrapper()),
+              (route) => false,
+            );
+          },
         ),
       ),
       (route) => false,
@@ -376,7 +365,7 @@ class AppWrapper extends StatefulWidget {
 
 class _AppWrapperState extends State<AppWrapper> {
   AuthNotifier? _authNotifier;
-  
+
   Future<bool> _checkApiServerAddress() async {
     final prefs = await SharedPreferences.getInstance();
     final address = prefs.getString('api_server_address');
@@ -416,7 +405,9 @@ class _AppWrapperState extends State<AppWrapper> {
         if (snapshot.hasData && snapshot.data == true) {
           // Address is set, initialize auth and show the main app
           return FutureBuilder<void>(
-            future: _authNotifier == null ? _initializeAuthNotifier() : Future.value(),
+            future: _authNotifier == null
+                ? _initializeAuthNotifier()
+                : Future.value(),
             builder: (context, authSnapshot) {
               if (authSnapshot.connectionState == ConnectionState.waiting) {
                 return const MaterialApp(
@@ -425,7 +416,7 @@ class _AppWrapperState extends State<AppWrapper> {
                   ),
                 );
               }
-              
+
               return ChangeNotifierProvider<AuthNotifier>.value(
                 value: _authNotifier!,
                 child: const App(),

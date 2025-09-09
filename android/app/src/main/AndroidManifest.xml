@@ -1,9 +1,39 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mtv_app">
-   <application
+    
+    <!-- 网络权限 - 视频播放必需 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    
+    <!-- 音视频播放权限 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
+    <!-- ExoPlayer and HLS streaming permissions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <!-- 允许在后台播放媒体 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    
+    <!-- 硬件加速和视频编解码器支持 -->
+    <uses-feature android:name="android.hardware.video.decoder" android:required="false" />
+    <uses-feature android:name="android.hardware.video.encoder" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    
+    <!-- 网络安全配置，允许HTTP连接 -->
+    <application
         android:label="mtv_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:hardwareAccelerated="true"
+        android:largeHeap="true"
+        android:allowBackup="false"
+        android:requestLegacyExternalStorage="true"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

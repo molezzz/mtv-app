@@ -1,5 +1,6 @@
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/core/services/image_proxy_service.dart';
+import 'package:mtv_app/src/core/utils/title_matcher.dart';
 import 'package:mtv_app/src/features/movies/data/models/movie_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/video_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/douban_movie_model.dart';
@@ -75,7 +76,53 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
             return VideoModel.fromJson(convertedJson);
           })
           .toList();
-      return videos;
+          
+      // 对搜索结果进行二次过滤，使用影片名精确匹配
+      final filteredVideos = videos.where((video) {
+        final videoTitle = video.title ?? '';
+        
+        // 使用智能标题匹配器进行匹配
+        final isMatched = TitleMatcher.isMatch(query, videoTitle);
+        
+        // 调试输出（开发环境可启用）
+        if (isMatched) {
+          print('✓ 匹配成功: "$query" -> "$videoTitle"');
+        }
+        
+        return isMatched;
+      }).toList();
+      
+      // 如果精确匹配没有结果，返回相似度最高的前3个结果
+      if (filteredVideos.isEmpty && videos.isNotEmpty) {
+        print('精确匹配无结果，使用相似度匹配');
+        
+        // 计算所有结果的相似度
+        final videosWithSimilarity = videos.map((video) {
+          final similarity = TitleMatcher.calculateSimilarity(query, video.title ?? '');
+          return {'video': video, 'similarity': similarity};
+        }).toList();
+        
+        // 按相似度降序排序
+        videosWithSimilarity.sort((a, b) => 
+          (b['similarity'] as double).compareTo(a['similarity'] as double));
+        
+        // 返回相似度大于0.6的结果，最多3个
+        final similarResults = videosWithSimilarity
+            .where((item) => (item['similarity'] as double) >= 0.6)
+            .take(3)
+            .map((item) => item['video'] as VideoModel)
+            .toList();
+            
+        if (similarResults.isNotEmpty) {
+          print('找到${similarResults.length}个相似结果');
+          return similarResults;
+        }
+      }
+      
+      print('原始搜索结果数量: ${videos.length}');
+      print('过滤后结果数量: ${filteredVideos.length}');
+      
+      return filteredVideos;
     } catch (e) {
       throw Exception('Failed to search videos: $e');
     }
@@ -111,7 +158,22 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
             return VideoModel.fromJson(convertedJson);
           })
           .toList();
-      return videos;
+          
+      // 对特定资源的搜索结果也进行精确过滤
+      final filteredVideos = videos.where((video) {
+        final videoTitle = video.title ?? '';
+        final isMatched = TitleMatcher.isMatch(query, videoTitle);
+        
+        if (isMatched) {
+          print('✓ 特定资源匹配成功: "$query" -> "$videoTitle" (源: $resourceId)');
+        }
+        
+        return isMatched;
+      }).toList();
+      
+      print('特定资源($resourceId)原始结果: ${videos.length}, 过滤后: ${filteredVideos.length}');
+      
+      return filteredVideos;
     } catch (e) {
       throw Exception('Failed to search videos from source: $e');
     }
