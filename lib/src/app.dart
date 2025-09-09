@@ -5,6 +5,9 @@ import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_source.dart';
 import 'package:mtv_app/src/features/movies/data/repositories/movie_repository_impl.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_video_sources.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
 import 'package:mtv_app/src/core/navigation/main_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -135,15 +138,17 @@ class _AppState extends State<App> {
                 
                 // User is authenticated, show main app
                 return BlocProvider(
-                  create: (context) => MovieBloc(
-                    getPopularMovies: GetPopularMovies(
-                      MovieRepositoryImpl(
-                        remoteDataSource: MovieRemoteDataSourceImpl(
-                          _apiClient!,
-                        ),
-                      ),
-                    ),
-                  ),
+                  create: (context) {
+                    final repository = MovieRepositoryImpl(
+                      remoteDataSource: MovieRemoteDataSourceImpl(_apiClient!),
+                    );
+                    return MovieBloc(
+                      getPopularMovies: GetPopularMovies(repository),
+                      getDoubanMovies: GetDoubanMovies(repository),
+                      searchVideos: SearchVideos(repository),
+                      getVideoSources: GetVideoSources(repository),
+                    );
+                  },
                   child: const MainPage(),
                 );
               },
@@ -255,7 +260,7 @@ class _AuthRequiredScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF2C2C2C),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [

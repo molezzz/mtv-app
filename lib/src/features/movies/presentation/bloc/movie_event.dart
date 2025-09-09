@@ -8,3 +8,44 @@ abstract class MovieEvent extends Equatable {
 }
 
 class FetchPopularMovies extends MovieEvent {}
+
+class FetchDoubanMovies extends MovieEvent {
+  final String type;
+  final String tag;
+  final int pageSize;
+  final int pageStart;
+
+  const FetchDoubanMovies({
+    required this.type,
+    required this.tag,
+    this.pageSize = 20,
+    this.pageStart = 0,
+  });
+
+  @override
+  List<Object> get props => [type, tag, pageSize, pageStart];
+}
+
+class SearchVideosEvent extends MovieEvent {
+  final String query;
+
+  const SearchVideosEvent(this.query);
+
+  @override
+  List<Object> get props => [query];
+}
+
+class FetchVideoSources extends MovieEvent {}
+
+class SelectCategory extends MovieEvent {
+  final String category;
+  final String type;
+
+  const SelectCategory({
+    required this.category,
+    required this.type,
+  });
+
+  @override
+  List<Object> get props => [category, type];
+}
