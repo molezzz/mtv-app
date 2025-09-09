@@ -4,6 +4,7 @@ import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_event.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_state.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/authenticated_image.dart';
+import 'package:mtv_app/src/features/movies/presentation/pages/video_player_page.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
@@ -439,15 +440,15 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
                 Icon(
                   Icons.play_circle_outline,
                   color: Colors.orange,
                   size: 24,
                 ),
-                const SizedBox(width: 12),
-                const Text(
+                SizedBox(width: 12),
+                Text(
                   '选择播放源',
                   style: TextStyle(
                     color: Colors.white,
@@ -541,18 +542,20 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   }
 
   void _playVideo(Video source, int index) {
-    // 这里可以集成视频播放器
-    // 暂时显示播放信息
-    final sourceName = source.sourceName ?? source.source ?? "未知来源";
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('播放第${index + 1}个源: $sourceName'),
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.orange,
+    // 导航到新的视频播放器页面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BlocProvider.value(
+          value: _movieBloc!,
+          child: VideoPlayerPage(
+            videoSource: source.source ?? 'unknown',
+            videoId: source.id,
+            title: source.title ?? widget.title ?? '未知标题',
+            videoSources: _videoSources,
+            selectedSourceIndex: index,
+          ),
+        ),
       ),
     );
-    
-    // 添加一个简单的反馈，确保点击有响应
-    print('点击播放: $sourceName (ID: ${source.id})');
   }
 }

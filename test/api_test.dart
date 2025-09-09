@@ -4,7 +4,7 @@ import 'package:mtv_app/src/features/movies/data/models/douban_movie_model.dart'
 
 void main() {
   // 模拟API响应
-  final apiResponse = '''
+  const apiResponse = '''
   {
     "code": 200,
     "message": "获取成功",

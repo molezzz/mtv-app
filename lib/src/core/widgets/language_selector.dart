@@ -4,7 +4,7 @@ import 'package:mtv_app/src/core/locale_notifier.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
 
 class LanguageSelector extends StatelessWidget {
-  const LanguageSelector({Key? key}) : super(key: key);
+  const LanguageSelector({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +24,7 @@ class LanguageSelector extends StatelessWidget {
               value: 'zh',
               child: Row(
                 children: [
-                  Text('🇨🇳'),
+                  const Text('🇨🇳'),
                   const SizedBox(width: 8),
                   Text(
                     '中文',
@@ -49,7 +49,7 @@ class LanguageSelector extends StatelessWidget {
               value: 'en',
               child: Row(
                 children: [
-                  Text('🇺🇸'),
+                  const Text('🇺🇸'),
                   const SizedBox(width: 8),
                   Text(
                     'English',

@@ -62,3 +62,13 @@ class FetchVideoDetail extends MovieEvent {
   @override
   List<Object> get props => [source, id];
 }
+
+class GetVideoDetailEvent extends MovieEvent {
+  final String source;
+  final String id;
+
+  const GetVideoDetailEvent(this.source, this.id);
+
+  @override
+  List<Object> get props => [source, id];
+}

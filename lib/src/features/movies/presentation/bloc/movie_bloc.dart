@@ -27,6 +27,7 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     on<FetchVideoSources>(_onFetchVideoSources);
     on<SelectCategory>(_onSelectCategory);
     on<FetchVideoDetail>(_onFetchVideoDetail);
+    on<GetVideoDetailEvent>(_onGetVideoDetailEvent);
   }
 
   Future<void> _onFetchPopularMovies(
@@ -117,6 +118,19 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
 
   Future<void> _onFetchVideoDetail(
     FetchVideoDetail event,
+    Emitter<MovieState> emit,
+  ) async {
+    emit(VideoDetailLoading());
+    try {
+      final videoDetail = await getVideoDetail(event.source, event.id);
+      emit(VideoDetailLoaded(videoDetail: videoDetail));
+    } catch (e) {
+      emit(MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onGetVideoDetailEvent(
+    GetVideoDetailEvent event,
     Emitter<MovieState> emit,
   ) async {
     emit(VideoDetailLoading());
