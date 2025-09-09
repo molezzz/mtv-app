@@ -9,6 +9,7 @@ class Video extends Equatable {
   final String? note; // 备注信息
   final String? type; // 类型
   final String? source; // 视频源
+  final String? sourceName; // 视频源名称
 
   const Video({
     required this.id,
@@ -19,8 +20,9 @@ class Video extends Equatable {
     this.note,
     this.type,
     this.source,
+    this.sourceName,
   });
 
   @override
-  List<Object?> get props => [id, title, description, pic, year, note, type, source];
+  List<Object?> get props => [id, title, description, pic, year, note, type, source, sourceName];
 }

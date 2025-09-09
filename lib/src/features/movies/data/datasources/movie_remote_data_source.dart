@@ -3,6 +3,7 @@ import 'package:mtv_app/src/core/services/image_proxy_service.dart';
 import 'package:mtv_app/src/features/movies/data/models/movie_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/video_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/douban_movie_model.dart';
+import 'package:mtv_app/src/features/movies/data/models/video_detail_model.dart';
 
 abstract class MovieRemoteDataSource {
   Future<List<MovieModel>> getPopularMovies();
@@ -22,6 +23,7 @@ abstract class MovieRemoteDataSource {
     int start = 0,
   });
   Future<List<Map<String, dynamic>>> getVideoSources();
+  Future<VideoDetailModel> getVideoDetail(String source, String id);
 }
 
 class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
@@ -53,8 +55,25 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
         '/api/search',
         queryParameters: {'q': query},
       );
-      final videos = (response.data['list'] as List? ?? [])
-          .map((videoJson) => VideoModel.fromJson(videoJson))
+      
+      // 搜索API返回的格式是 {"results": [...]}
+      // 但字段名与VideoModel期望的不同，需要转换
+      final videos = (response.data['results'] as List? ?? [])
+          .map((searchJson) {
+            // 确保所有必需字段都有非空值
+            final convertedJson = <String, dynamic>{
+              'vod_id': (searchJson['id']?.toString() ?? '').isEmpty ? 'unknown' : searchJson['id']?.toString() ?? 'unknown',
+              'vod_name': (searchJson['title']?.toString() ?? '').isEmpty ? 'Unknown Title' : searchJson['title']?.toString() ?? 'Unknown Title',
+              'vod_content': searchJson['desc']?.toString(),
+              'vod_pic': searchJson['poster']?.toString(),
+              'vod_year': searchJson['year']?.toString(),
+              'vod_remarks': searchJson['class']?.toString(), // 使用class字段作为影片分类
+              'type_name': searchJson['type_name']?.toString(),
+              'source': searchJson['source']?.toString(),
+              'source_name': searchJson['source_name']?.toString(), // 添加source_name映射
+            };
+            return VideoModel.fromJson(convertedJson);
+          })
           .toList();
       return videos;
     } catch (e) {
@@ -72,8 +91,25 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
           'resourceId': resourceId,
         },
       );
-      final videos = (response.data['list'] as List? ?? [])
-          .map((videoJson) => VideoModel.fromJson(videoJson))
+      
+      // 搜索API返回的格式是 {"results": [...]}
+      // 但字段名与VideoModel期望的不同，需要转换
+      final videos = (response.data['results'] as List? ?? [])
+          .map((searchJson) {
+            // 确保所有必需字段都有非空值
+            final convertedJson = <String, dynamic>{
+              'vod_id': (searchJson['id']?.toString() ?? '').isEmpty ? 'unknown' : searchJson['id']?.toString() ?? 'unknown',
+              'vod_name': (searchJson['title']?.toString() ?? '').isEmpty ? 'Unknown Title' : searchJson['title']?.toString() ?? 'Unknown Title',
+              'vod_content': searchJson['desc']?.toString(),
+              'vod_pic': searchJson['poster']?.toString(),
+              'vod_year': searchJson['year']?.toString(),
+              'vod_remarks': searchJson['class']?.toString(), // 使用class字段作为影片分类
+              'type_name': searchJson['type_name']?.toString(),
+              'source': searchJson['source']?.toString(),
+              'source_name': searchJson['source_name']?.toString(), // 添加source_name映射
+            };
+            return VideoModel.fromJson(convertedJson);
+          })
           .toList();
       return videos;
     } catch (e) {
@@ -255,6 +291,33 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
       return List<Map<String, dynamic>>.from(response.data ?? []);
     } catch (e) {
       throw Exception('Failed to load video sources: $e');
+    }
+  }
+
+  @override
+  Future<VideoDetailModel> getVideoDetail(String source, String id) async {
+    try {
+      final response = await _apiClient.dio.get(
+        '/api/detail',
+        queryParameters: {
+          'source': source,
+          'id': id,
+        },
+      );
+      
+      // 处理图片代理
+      final Map<String, dynamic> videoDetailJson = Map<String, dynamic>.from(response.data);
+      if (videoDetailJson['poster'] != null) {
+        final originalUrl = videoDetailJson['poster'] as String;
+        if (!originalUrl.contains('/api/image-proxy')) {
+          final proxiedUrl = _imageProxyService.getProxiedImageUrl(originalUrl);
+          videoDetailJson['poster'] = proxiedUrl;
+        }
+      }
+      
+      return VideoDetailModel.fromJson(videoDetailJson);
+    } catch (e) {
+      throw Exception('Failed to load video detail: $e');
     }
   }
 }

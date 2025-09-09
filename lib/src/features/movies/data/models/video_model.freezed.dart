@@ -35,6 +35,8 @@ mixin _$VideoModel {
   @JsonKey(name: 'type_name')
   String? get type => throw _privateConstructorUsedError;
   String? get source => throw _privateConstructorUsedError;
+  @JsonKey(name: 'source_name')
+  String? get sourceName => throw _privateConstructorUsedError;
 
   /// Serializes this VideoModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -60,7 +62,8 @@ abstract class $VideoModelCopyWith<$Res> {
       @JsonKey(name: 'vod_year') String? year,
       @JsonKey(name: 'vod_remarks') String? note,
       @JsonKey(name: 'type_name') String? type,
-      String? source});
+      String? source,
+      @JsonKey(name: 'source_name') String? sourceName});
 }
 
 /// @nodoc
@@ -86,6 +89,7 @@ class _$VideoModelCopyWithImpl<$Res, $Val extends VideoModel>
     Object? note = freezed,
     Object? type = freezed,
     Object? source = freezed,
+    Object? sourceName = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -120,6 +124,10 @@ class _$VideoModelCopyWithImpl<$Res, $Val extends VideoModel>
           ? _value.source
           : source // ignore: cast_nullable_to_non_nullable
               as String?,
+      sourceName: freezed == sourceName
+          ? _value.sourceName
+          : sourceName // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -140,7 +148,8 @@ abstract class _$$VideoModelImplCopyWith<$Res>
       @JsonKey(name: 'vod_year') String? year,
       @JsonKey(name: 'vod_remarks') String? note,
       @JsonKey(name: 'type_name') String? type,
-      String? source});
+      String? source,
+      @JsonKey(name: 'source_name') String? sourceName});
 }
 
 /// @nodoc
@@ -164,6 +173,7 @@ class __$$VideoModelImplCopyWithImpl<$Res>
     Object? note = freezed,
     Object? type = freezed,
     Object? source = freezed,
+    Object? sourceName = freezed,
   }) {
     return _then(_$VideoModelImpl(
       id: null == id
@@ -198,6 +208,10 @@ class __$$VideoModelImplCopyWithImpl<$Res>
           ? _value.source
           : source // ignore: cast_nullable_to_non_nullable
               as String?,
+      sourceName: freezed == sourceName
+          ? _value.sourceName
+          : sourceName // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -206,14 +220,15 @@ class __$$VideoModelImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$VideoModelImpl implements _VideoModel {
   const _$VideoModelImpl(
-      {@JsonKey(name: 'vod_id') required this.id,
-      @JsonKey(name: 'vod_name') required this.title,
+      {@JsonKey(name: 'vod_id') this.id = 'unknown',
+      @JsonKey(name: 'vod_name') this.title = 'Unknown Title',
       @JsonKey(name: 'vod_content') this.description,
       @JsonKey(name: 'vod_pic') this.pic,
       @JsonKey(name: 'vod_year') this.year,
       @JsonKey(name: 'vod_remarks') this.note,
       @JsonKey(name: 'type_name') this.type,
-      this.source});
+      this.source,
+      @JsonKey(name: 'source_name') this.sourceName});
 
   factory _$VideoModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$VideoModelImplFromJson(json);
@@ -241,10 +256,13 @@ class _$VideoModelImpl implements _VideoModel {
   final String? type;
   @override
   final String? source;
+  @override
+  @JsonKey(name: 'source_name')
+  final String? sourceName;
 
   @override
   String toString() {
-    return 'VideoModel(id: $id, title: $title, description: $description, pic: $pic, year: $year, note: $note, type: $type, source: $source)';
+    return 'VideoModel(id: $id, title: $title, description: $description, pic: $pic, year: $year, note: $note, type: $type, source: $source, sourceName: $sourceName)';
   }
 
   @override
@@ -260,13 +278,15 @@ class _$VideoModelImpl implements _VideoModel {
             (identical(other.year, year) || other.year == year) &&
             (identical(other.note, note) || other.note == note) &&
             (identical(other.type, type) || other.type == type) &&
-            (identical(other.source, source) || other.source == source));
+            (identical(other.source, source) || other.source == source) &&
+            (identical(other.sourceName, sourceName) ||
+                other.sourceName == sourceName));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType, id, title, description, pic, year, note, type, source);
+  int get hashCode => Object.hash(runtimeType, id, title, description, pic,
+      year, note, type, source, sourceName);
 
   /// Create a copy of VideoModel
   /// with the given fields replaced by the non-null parameter values.
@@ -286,14 +306,16 @@ class _$VideoModelImpl implements _VideoModel {
 
 abstract class _VideoModel implements VideoModel {
   const factory _VideoModel(
-      {@JsonKey(name: 'vod_id') required final String id,
-      @JsonKey(name: 'vod_name') required final String title,
-      @JsonKey(name: 'vod_content') final String? description,
-      @JsonKey(name: 'vod_pic') final String? pic,
-      @JsonKey(name: 'vod_year') final String? year,
-      @JsonKey(name: 'vod_remarks') final String? note,
-      @JsonKey(name: 'type_name') final String? type,
-      final String? source}) = _$VideoModelImpl;
+          {@JsonKey(name: 'vod_id') final String id,
+          @JsonKey(name: 'vod_name') final String title,
+          @JsonKey(name: 'vod_content') final String? description,
+          @JsonKey(name: 'vod_pic') final String? pic,
+          @JsonKey(name: 'vod_year') final String? year,
+          @JsonKey(name: 'vod_remarks') final String? note,
+          @JsonKey(name: 'type_name') final String? type,
+          final String? source,
+          @JsonKey(name: 'source_name') final String? sourceName}) =
+      _$VideoModelImpl;
 
   factory _VideoModel.fromJson(Map<String, dynamic> json) =
       _$VideoModelImpl.fromJson;
@@ -321,6 +343,9 @@ abstract class _VideoModel implements VideoModel {
   String? get type;
   @override
   String? get source;
+  @override
+  @JsonKey(name: 'source_name')
+  String? get sourceName;
 
   /// Create a copy of VideoModel
   /// with the given fields replaced by the non-null parameter values.

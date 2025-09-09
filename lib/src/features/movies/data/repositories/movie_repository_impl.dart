@@ -2,6 +2,7 @@ import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_s
 import 'package:mtv_app/src/features/movies/domain/entities/movie.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/douban_movie.dart';
+import 'package:mtv_app/src/features/movies/domain/entities/video_detail.dart';
 import 'package:mtv_app/src/features/movies/domain/repositories/movie_repository.dart';
 
 class MovieRepositoryImpl implements MovieRepository {
@@ -36,6 +37,7 @@ class MovieRepositoryImpl implements MovieRepository {
               note: model.note,
               type: model.type,
               source: model.source,
+              sourceName: model.sourceName,
             ))
         .toList();
     return videos;
@@ -54,6 +56,7 @@ class MovieRepositoryImpl implements MovieRepository {
               note: model.note,
               type: model.type,
               source: model.source,
+              sourceName: model.sourceName,
             ))
         .toList();
     return videos;
@@ -122,5 +125,25 @@ class MovieRepositoryImpl implements MovieRepository {
   @override
   Future<List<Map<String, dynamic>>> getVideoSources() async {
     return await remoteDataSource.getVideoSources();
+  }
+
+  @override
+  Future<VideoDetail> getVideoDetail(String source, String id) async {
+    final videoDetailModel = await remoteDataSource.getVideoDetail(source, id);
+    return VideoDetail(
+      id: videoDetailModel.id,
+      title: videoDetailModel.title,
+      poster: videoDetailModel.poster,
+      source: videoDetailModel.source,
+      sourceName: videoDetailModel.sourceName,
+      desc: videoDetailModel.desc,
+      type: videoDetailModel.type,
+      year: videoDetailModel.year,
+      area: videoDetailModel.area,
+      director: videoDetailModel.director,
+      actor: videoDetailModel.actor,
+      remarks: videoDetailModel.remarks,
+      episodes: videoDetailModel.episodes,
+    );
   }
 }

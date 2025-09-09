@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/movie.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/douban_movie.dart';
+import 'package:mtv_app/src/features/movies/domain/entities/video_detail.dart';
 
 abstract class MovieState extends Equatable {
   const MovieState();
@@ -59,6 +60,17 @@ class VideoSourcesLoaded extends MovieState {
   @override
   List<Object> get props => [sources];
 }
+
+class VideoDetailLoaded extends MovieState {
+  final VideoDetail videoDetail;
+
+  const VideoDetailLoaded({required this.videoDetail});
+
+  @override
+  List<Object> get props => [videoDetail];
+}
+
+class VideoDetailLoading extends MovieState {}
 
 class MovieError extends MovieState {
   final String message;

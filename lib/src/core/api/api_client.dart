@@ -11,8 +11,8 @@ class ApiClient {
 
   ApiClient({required String baseUrl}) {
     _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(milliseconds: 5000);
-    _dio.options.receiveTimeout = const Duration(milliseconds: 3000);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 30);
     
     // 添加Cookie管理器
     _dio.interceptors.add(CookieManager(_cookieJar));

@@ -3,6 +3,7 @@ import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.d
 import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_sources.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_video_detail.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_event.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_state.dart';
 
@@ -11,18 +12,21 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
   final GetDoubanMovies getDoubanMovies;
   final SearchVideos searchVideos;
   final GetVideoSources getVideoSources;
+  final GetVideoDetail getVideoDetail;
 
   MovieBloc({
     required this.getPopularMovies,
     required this.getDoubanMovies,
     required this.searchVideos,
     required this.getVideoSources,
+    required this.getVideoDetail,
   }) : super(MovieInitial()) {
     on<FetchPopularMovies>(_onFetchPopularMovies);
     on<FetchDoubanMovies>(_onFetchDoubanMovies);
     on<SearchVideosEvent>(_onSearchVideos);
     on<FetchVideoSources>(_onFetchVideoSources);
     on<SelectCategory>(_onSelectCategory);
+    on<FetchVideoDetail>(_onFetchVideoDetail);
   }
 
   Future<void> _onFetchPopularMovies(
@@ -108,6 +112,19 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       ));
     } catch (e) {
       emit(MovieError(message: 'Failed to fetch category movies: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onFetchVideoDetail(
+    FetchVideoDetail event,
+    Emitter<MovieState> emit,
+  ) async {
+    emit(VideoDetailLoading());
+    try {
+      final videoDetail = await getVideoDetail(event.source, event.id);
+      emit(VideoDetailLoaded(videoDetail: videoDetail));
+    } catch (e) {
+      emit(MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
     }
   }
 }

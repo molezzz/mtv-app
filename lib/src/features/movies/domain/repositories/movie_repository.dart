@@ -1,6 +1,7 @@
 import 'package:mtv_app/src/features/movies/domain/entities/movie.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/douban_movie.dart';
+import 'package:mtv_app/src/features/movies/domain/entities/video_detail.dart';
 
 abstract class MovieRepository {
   Future<List<Movie>> getPopularMovies();
@@ -20,4 +21,5 @@ abstract class MovieRepository {
     int start = 0,
   });
   Future<List<Map<String, dynamic>>> getVideoSources();
+  Future<VideoDetail> getVideoDetail(String source, String id);
 }

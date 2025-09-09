@@ -49,3 +49,16 @@ class SelectCategory extends MovieEvent {
   @override
   List<Object> get props => [category, type];
 }
+
+class FetchVideoDetail extends MovieEvent {
+  final String source;
+  final String id;
+
+  const FetchVideoDetail({
+    required this.source,
+    required this.id,
+  });
+
+  @override
+  List<Object> get props => [source, id];
+}

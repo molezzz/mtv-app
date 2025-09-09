@@ -8,7 +8,7 @@ import '../widgets/login_dialog.dart';
 class SettingsPage extends StatefulWidget {
   final VoidCallback onSettingsSaved;
 
-  const SettingsPage({Key? key, required this.onSettingsSaved}) : super(key: key);
+  const SettingsPage({super.key, required this.onSettingsSaved});
 
   @override
   _SettingsPageState createState() => _SettingsPageState();
@@ -51,7 +51,7 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final dio = Dio();
       final validationUrl = '$address/api/server-config';
-      final response = await dio.get(validationUrl, options: Options(sendTimeout: const Duration(milliseconds: 5000), receiveTimeout: const Duration(milliseconds: 5000)));
+      final response = await dio.get(validationUrl, options: Options(sendTimeout: const Duration(seconds: 30), receiveTimeout: const Duration(seconds: 30)));
       if (response.statusCode == 200) {
         isValid = true;
       }

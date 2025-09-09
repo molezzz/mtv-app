@@ -6,6 +6,8 @@ import 'package:mtv_app/src/features/movies/presentation/bloc/movie_state.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/movie_card.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/category_selector.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/search_bar.dart' as custom;
+import 'package:mtv_app/src/features/movies/presentation/utils/navigation_helper.dart';
+import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
 import 'package:mtv_app/src/features/settings/presentation/pages/settings_page.dart';
 import 'package:mtv_app/src/core/widgets/language_selector.dart';
@@ -282,12 +284,27 @@ class _MoviesPageState extends State<MoviesPage> {
           description: movie.description,
           rating: movie.rating,
           onTap: () {
-            // TODO: 导航到电影详情页
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('点击了: ${movie.title}'),
-                duration: const Duration(seconds: 1),
-              ),
+            // 使用NavigationHelper处理导航，完全独立于当前页面状态
+            final currentState = context.read<MovieBloc>().state;
+            Video? videoSource;
+            
+            // 如果当前是搜索结果状态，获取对应的video对象
+            if (currentState is VideosLoaded) {
+              try {
+                videoSource = currentState.videos.firstWhere(
+                  (v) => v.title == movie.title,
+                );
+              } catch (e) {
+                // 找不到对应的video，使用搜索
+                videoSource = null;
+              }
+            }
+            
+            NavigationHelper.navigateToMovieDetail(
+              context: context,
+              title: movie.title,
+              imageUrl: movie.imageUrl,
+              video: videoSource,
             );
           },
         );

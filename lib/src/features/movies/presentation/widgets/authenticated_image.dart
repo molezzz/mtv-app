@@ -48,7 +48,12 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
         print('Using proxy URL: $imageUrl');
       }
 
-      final dio = Dio();
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
       
       // 添加认证Cookie
       final prefs = await SharedPreferences.getInstance();

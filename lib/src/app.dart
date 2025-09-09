@@ -8,6 +8,7 @@ import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.d
 import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_sources.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_video_detail.dart';
 import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
 import 'package:mtv_app/src/core/navigation/main_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -147,6 +148,7 @@ class _AppState extends State<App> {
                       getDoubanMovies: GetDoubanMovies(repository),
                       searchVideos: SearchVideos(repository),
                       getVideoSources: GetVideoSources(repository),
+                      getVideoDetail: GetVideoDetail(repository),
                     );
                   },
                   child: const MainPage(),
@@ -173,7 +175,7 @@ class _AuthRequiredScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.lock_outline,
                 size: 80,
                 color: Colors.amber,
@@ -264,7 +266,7 @@ class _AuthRequiredScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.dns,
                             size: 16,
                             color: Colors.amber,
@@ -366,7 +368,7 @@ class _AuthRequiredScreen extends StatelessWidget {
 }
 
 class AppWrapper extends StatefulWidget {
-  const AppWrapper({Key? key}) : super(key: key);
+  const AppWrapper({super.key});
 
   @override
   _AppWrapperState createState() => _AppWrapperState();

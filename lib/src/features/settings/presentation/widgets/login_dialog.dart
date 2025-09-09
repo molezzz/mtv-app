@@ -8,10 +8,10 @@ class LoginDialog extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
 
   const LoginDialog({
-    Key? key,
+    super.key,
     required this.serverAddress,
     this.onLoginSuccess,
-  }) : super(key: key);
+  });
 
   @override
   _LoginDialogState createState() => _LoginDialogState();
@@ -74,7 +74,7 @@ class _LoginDialogState extends State<LoginDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
