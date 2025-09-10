@@ -5,6 +5,7 @@ import 'package:mtv_app/src/features/movies/data/models/movie_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/video_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/douban_movie_model.dart';
 import 'package:mtv_app/src/features/movies/data/models/video_detail_model.dart';
+import 'package:mtv_app/src/features/movies/data/models/play_record_model.dart';
 
 abstract class MovieRemoteDataSource {
   Future<List<MovieModel>> getPopularMovies();
@@ -25,6 +26,9 @@ abstract class MovieRemoteDataSource {
   });
   Future<List<Map<String, dynamic>>> getVideoSources();
   Future<VideoDetailModel> getVideoDetail(String source, String id);
+  Future<Map<String, PlayRecordModel>> getPlayRecords();
+  Future<bool> savePlayRecord(String key, PlayRecordModel record);
+  Future<bool> deletePlayRecord(String key);
 }
 
 class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
@@ -380,6 +384,56 @@ class MovieRemoteDataSourceImpl implements MovieRemoteDataSource {
       return VideoDetailModel.fromJson(videoDetailJson);
     } catch (e) {
       throw Exception('Failed to load video detail: $e');
+    }
+  }
+
+  @override
+  Future<Map<String, PlayRecordModel>> getPlayRecords() async {
+    try {
+      final response = await _apiClient.dio.get('/api/playrecords');
+      final Map<String, dynamic> recordsData = response.data as Map<String, dynamic>;
+      
+      final Map<String, PlayRecordModel> records = {};
+      recordsData.forEach((key, value) {
+        records[key] = PlayRecordModel.fromJson(value as Map<String, dynamic>);
+      });
+      
+      return records;
+    } catch (e) {
+      throw Exception('Failed to load play records: $e');
+    }
+  }
+
+  @override
+  Future<bool> savePlayRecord(String key, PlayRecordModel record) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/api/playrecords',
+        data: {
+          'key': key,
+          'record': record.toJson(),
+        },
+      );
+      
+      final Map<String, dynamic> result = response.data as Map<String, dynamic>;
+      return result['success'] as bool? ?? false;
+    } catch (e) {
+      throw Exception('Failed to save play record: $e');
+    }
+  }
+
+  @override
+  Future<bool> deletePlayRecord(String key) async {
+    try {
+      final response = await _apiClient.dio.delete(
+        '/api/playrecords',
+        queryParameters: {'key': key},
+      );
+      
+      final Map<String, dynamic> result = response.data as Map<String, dynamic>;
+      return result['success'] as bool? ?? false;
+    } catch (e) {
+      throw Exception('Failed to delete play record: $e');
     }
   }
 }

@@ -266,6 +266,36 @@ class AppLocalizations {
         return 'Your Favorite Content';
     }
   }
+
+  String get episode {
+    switch (localeName) {
+      case 'zh':
+        return '集数';
+      case 'en':
+      default:
+        return 'Episode';
+    }
+  }
+
+  String get lastWatched {
+    switch (localeName) {
+      case 'zh':
+        return '最后观看';
+      case 'en':
+      default:
+        return 'Last watched';
+    }
+  }
+
+  String get noRecords {
+    switch (localeName) {
+      case 'zh':
+        return '暂无记录';
+      case 'en':
+      default:
+        return 'No records yet';
+    }
+  }
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

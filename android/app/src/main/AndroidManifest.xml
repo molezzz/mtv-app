@@ -33,7 +33,7 @@
     
     <!-- 网络安全配置，允许HTTP连接 -->
     <application
-        android:label="mtv_app"
+        android:label="DawnTV"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"

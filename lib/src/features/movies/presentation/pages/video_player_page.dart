@@ -13,6 +13,10 @@ import 'package:mtv_app/src/core/services/cast_service.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
 import 'package:mtv_app/src/features/movies/presentation/pages/cast_control_page.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/video_player_widget.dart';
+import 'package:mtv_app/src/features/movies/data/models/play_record_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtv_app/src/core/api/api_client.dart';
+import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_source.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoSource;
@@ -63,6 +67,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _isBuffering = false; // 是否正在缓冲
   Duration? _seekTarget; // 期望跳转到的目标位置
   Duration? _dragPosition; // UI层当前拖动的位置
+  late MovieRemoteDataSource _dataSource; // 用于保存播放记录
+  Timer? _playRecordTimer; // 定时保存播放记录
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
@@ -75,12 +81,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _setScreenToLandscape();
     WakelockPlus.enable(); // 保持屏幕常亮
     _checkCastingStatus();
+    _initializeDataSource(); // 初始化数据源
   }
 
   @override
   void dispose() {
     _disposeControllers();
     _hideControlsTimer?.cancel(); // 取消计时器
+    _playRecordTimer?.cancel(); // 取消播放记录定时器
+    _savePlayRecord(); // 页面销毁前保存一次播放记录
     _setScreenToPortrait();
     WakelockPlus.disable(); // 恢复屏幕锁定
     // 只在移动平台停止设备发现
@@ -89,6 +98,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       CastService.stopDiscovery();
     }
     super.dispose();
+  }
+
+  void _initializeDataSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    // 修复：使用正确的键名 'api_server_address' 而不是 'server_url'
+    final serverUrl = prefs.getString('api_server_address') ?? 'http://localhost:3000';
+    final apiClient = ApiClient(baseUrl: serverUrl);
+    _dataSource = MovieRemoteDataSourceImpl(apiClient);
   }
 
   void _setScreenToLandscape() {
@@ -372,6 +389,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         _isLoading = false;
         _hasError = false;
       });
+      
+      // 启动播放记录定时器
+      _startPlayRecordTimer();
     } catch (e) {
       print('播放视频URL处理失败: $e');
       setState(() {
@@ -382,8 +402,44 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
+  // 启动播放记录定时器
+  void _startPlayRecordTimer() {
+    _playRecordTimer?.cancel();
+    _playRecordTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _savePlayRecord();
+    });
+  }
+
+  // 保存播放记录
+  Future<void> _savePlayRecord() async {
+    if (_videoDetail == null || _currentVideoUrl == null) return;
+
+    try {
+      final key = '${widget.videoSource}+${widget.videoId}';
+      final record = PlayRecordModel(
+        title: _videoDetail!.title ?? widget.title,
+        sourceName: _videoDetail!.sourceName ?? '',
+        cover: _videoDetail!.poster ?? '',
+        index: _currentEpisodeIndex + 1,
+        totalEpisodes: _episodes.length,
+        playTime: _position.inSeconds,
+        totalTime: _duration.inSeconds,
+        saveTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        year: _videoDetail!.year ?? '',
+      );
+
+      await _dataSource.savePlayRecord(key, record);
+      print('播放记录已保存: ${record.title}');
+    } catch (e) {
+      print('保存播放记录失败: $e');
+    }
+  }
+
   void _playEpisode(int index) {
     if (index >= 0 && index < _episodes.length) {
+      // 切换集数前先保存当前播放记录
+      _savePlayRecord();
+      
       setState(() {
         _currentEpisodeIndex = index;
       });
@@ -395,6 +451,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (_videoSources != null &&
         sourceIndex >= 0 &&
         sourceIndex < _videoSources!.length) {
+      // 切换源前先保存当前播放记录
+      _savePlayRecord();
+      
       setState(() {
         _currentSourceIndex = sourceIndex;
         _currentEpisodeIndex = 0; // 重置到第一集
@@ -587,6 +646,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<bool> _onWillPop() async {
+    // 退出前保存播放记录
+    _savePlayRecord();
     // 恢复竖屏模式
     _setScreenToPortrait();
     // 返回true允许页面退出
@@ -810,7 +871,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               // 返回按钮
               GestureDetector(
                 onTap: () {
-                  // 恢复竖屏模式并返回
+                  // 保存播放记录并恢复竖屏模式并返回
+                  _savePlayRecord();
                   _setScreenToPortrait();
                   Navigator.pop(context);
                 },

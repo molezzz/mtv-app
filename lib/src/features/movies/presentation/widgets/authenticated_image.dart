@@ -34,6 +34,9 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
 
   Future<void> _loadImage() async {
     try {
+      // 检查组件是否仍然挂载
+      if (!mounted) return;
+      
       setState(() {
         _isLoading = true;
         _error = null;
@@ -75,6 +78,9 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
         ),
       );
 
+      // 检查组件是否仍然挂载
+      if (!mounted) return;
+      
       if (response.statusCode == 200) {
         setState(() {
           _imageData = Uint8List.fromList(response.data);
@@ -85,6 +91,9 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
       }
     } catch (e) {
       print('Image load error: $e');
+      // 检查组件是否仍然挂载
+      if (!mounted) return;
+      
       setState(() {
         _error = e.toString();
         _isLoading = false;
