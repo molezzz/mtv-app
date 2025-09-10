@@ -6,6 +6,7 @@ class CastDeviceSelector extends StatefulWidget {
   final String title;
   final String? poster;
   final int? currentTime;
+  final Function(CastDevice)? onDeviceConnected;
 
   const CastDeviceSelector({
     super.key,
@@ -13,6 +14,7 @@ class CastDeviceSelector extends StatefulWidget {
     required this.title,
     this.poster,
     this.currentTime,
+    this.onDeviceConnected,
   });
 
   @override
@@ -37,24 +39,45 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
     });
 
     try {
+      // 初始化投屏服务
       await CastService.initialize();
+
+      // 启动设备发现
       await CastService.startDiscovery();
-      
-      // 等待一段时间让设备发现完成
-      await Future.delayed(const Duration(seconds: 2));
-      
-      final devices = await CastService.getAvailableDevices();
-      setState(() {
-        _devices = devices;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+
+      // 等待设备发现完成 - 增加等待时间以确保DLNA设备可以被发现
+      for (int i = 0; i < 10; i++) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          final devices = await CastService.getAvailableDevices();
+          setState(() {
+            _devices = devices;
+          });
+          // 如果找到设备且等待时间超过5秒，可以提前结束
+          if (devices.isNotEmpty && i >= 4) {
+            break;
+          }
+        }
+      }
+
+      // 最终更新设备列表
       if (mounted) {
+        final devices = await CastService.getAvailableDevices();
+        setState(() {
+          _devices = devices;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('初始化投屏失败: $e')),
+          SnackBar(
+            content: Text('初始化投屏失败: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -79,6 +102,9 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
 
         if (castSuccess) {
           if (mounted) {
+            // 通知父组件设备已连接
+            widget.onDeviceConnected?.call(device);
+
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -159,7 +185,12 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                   SizedBox(height: 16),
                   Text(
                     '正在搜索设备...',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '正在扫描Chromecast、DLNA和Miracast设备',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],
               ),
@@ -183,11 +214,12 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '请确保设备在同一网络下',
+                    '请确保设备在同一网络下，支持Chromecast、DLNA和Miracast设备',
                     style: TextStyle(
                       color: Colors.grey[500],
                       fontSize: 14,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -208,8 +240,9 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                 itemCount: _devices.length,
                 itemBuilder: (context, index) {
                   final device = _devices[index];
-                  final isConnecting = _isConnecting && _selectedDeviceId == device.id;
-                  
+                  final isConnecting =
+                      _isConnecting && _selectedDeviceId == device.id;
+
                   return Card(
                     color: Colors.grey[800],
                     margin: const EdgeInsets.only(bottom: 8),
@@ -219,6 +252,7 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                         child: Icon(
                           _getDeviceIcon(device.type),
                           color: Colors.white,
+                          size: 20,
                         ),
                       ),
                       title: Text(
@@ -229,12 +263,26 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      subtitle: Text(
-                        _getDeviceTypeText(device.type),
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            device.typeDisplayName,
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 14,
+                            ),
+                          ),
+                          if (device.manufacturer != null &&
+                              device.manufacturer!.isNotEmpty)
+                            Text(
+                              device.manufacturer!,
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
                       trailing: isConnecting
                           ? const SizedBox(
@@ -246,8 +294,12 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
                               ),
                             )
                           : Icon(
-                              device.isAvailable ? Icons.cast : Icons.cast_connected,
-                              color: device.isAvailable ? Colors.orange : Colors.grey,
+                              device.isAvailable
+                                  ? Icons.cast
+                                  : Icons.cast_connected,
+                              color: device.isAvailable
+                                  ? Colors.orange
+                                  : Colors.grey,
                             ),
                       onTap: device.isAvailable && !isConnecting
                           ? () => _connectToDevice(device)
@@ -281,6 +333,10 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
       case 'chromecast':
       case 'android_tv':
         return Icons.cast;
+      case 'dlna':
+        return Icons.tv;
+      case 'miracast':
+        return Icons.screen_share;
       case 'airplay':
       case 'apple_tv':
         return Icons.airplay;
@@ -294,9 +350,13 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
       case 'chromecast':
       case 'android_tv':
         return Colors.green;
+      case 'dlna':
+        return Colors.blue;
+      case 'miracast':
+        return Colors.orange;
       case 'airplay':
       case 'apple_tv':
-        return Colors.blue;
+        return Colors.grey;
       default:
         return Colors.grey;
     }
@@ -306,6 +366,10 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
     switch (type.toLowerCase()) {
       case 'chromecast':
         return 'Chromecast';
+      case 'dlna':
+        return 'DLNA设备';
+      case 'miracast':
+        return 'Miracast';
       case 'android_tv':
         return 'Android TV';
       case 'airplay':

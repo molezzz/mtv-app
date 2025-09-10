@@ -16,7 +16,8 @@ class CastService {
   /// 获取可用的投屏设备列表
   static Future<List<CastDevice>> getAvailableDevices() async {
     try {
-      final List<dynamic> devices = await _channel.invokeMethod('getAvailableDevices');
+      final List<dynamic> devices =
+          await _channel.invokeMethod('getAvailableDevices');
       return devices.map((device) => CastDevice.fromMap(device)).toList();
     } on PlatformException catch (e) {
       debugPrint('Failed to get available devices: ${e.message}');
@@ -117,7 +118,8 @@ class CastService {
   /// 获取当前播放状态
   static Future<CastPlaybackState?> getPlaybackState() async {
     try {
-      final Map<dynamic, dynamic>? state = await _channel.invokeMethod('getPlaybackState');
+      final Map<dynamic, dynamic>? state =
+          await _channel.invokeMethod('getPlaybackState');
       if (state != null) {
         return CastPlaybackState.fromMap(state.cast<String, dynamic>());
       }
@@ -151,14 +153,18 @@ class CastService {
 class CastDevice {
   final String id;
   final String name;
-  final String type; // 'chromecast', 'airplay', etc.
+  final String type; // 'chromecast', 'dlna', 'airplay', etc.
   final bool isAvailable;
+  final String? manufacturer;
+  final String? model;
 
   const CastDevice({
     required this.id,
     required this.name,
     required this.type,
     this.isAvailable = true,
+    this.manufacturer,
+    this.model,
   });
 
   factory CastDevice.fromMap(Map<dynamic, dynamic> map) {
@@ -167,6 +173,8 @@ class CastDevice {
       name: map['name']?.toString() ?? '',
       type: map['type']?.toString() ?? '',
       isAvailable: map['isAvailable'] ?? true,
+      manufacturer: map['manufacturer']?.toString(),
+      model: map['model']?.toString(),
     );
   }
 
@@ -176,12 +184,70 @@ class CastDevice {
       'name': name,
       'type': type,
       'isAvailable': isAvailable,
+      'manufacturer': manufacturer,
+      'model': model,
     };
   }
 
   @override
   String toString() {
-    return 'CastDevice{id: $id, name: $name, type: $type, isAvailable: $isAvailable}';
+    return 'CastDevice{id: $id, name: $name, type: $type, isAvailable: $isAvailable, manufacturer: $manufacturer, model: $model}';
+  }
+
+  /// 获取设备类型的显示名称
+  String get typeDisplayName {
+    switch (type.toLowerCase()) {
+      case 'chromecast':
+        return 'Chromecast';
+      case 'dlna':
+        return 'DLNA设备';
+      case 'miracast':
+        return 'Miracast';
+      case 'airplay':
+        return 'AirPlay';
+      case 'android_tv':
+        return 'Android TV';
+      case 'apple_tv':
+        return 'Apple TV';
+      default:
+        return '智能电视';
+    }
+  }
+
+  /// 获取设备图标
+  String get iconName {
+    switch (type.toLowerCase()) {
+      case 'chromecast':
+      case 'android_tv':
+        return 'cast';
+      case 'dlna':
+        return 'tv';
+      case 'miracast':
+        return 'screen_share';
+      case 'airplay':
+      case 'apple_tv':
+        return 'airplay';
+      default:
+        return 'tv';
+    }
+  }
+
+  /// 获取设备颜色
+  String get colorName {
+    switch (type.toLowerCase()) {
+      case 'chromecast':
+      case 'android_tv':
+        return 'green';
+      case 'dlna':
+        return 'blue';
+      case 'miracast':
+        return 'orange';
+      case 'airplay':
+      case 'apple_tv':
+        return 'grey';
+      default:
+        return 'grey';
+    }
   }
 }
 

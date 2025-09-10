@@ -1,6 +1,26 @@
 # mtv_app
 
-A new Flutter project.
+A Flutter-based multimedia application with comprehensive casting support.
+
+## Features
+
+### Video Playback
+- Multiple video format support
+- Adaptive streaming with quality selection
+- Full-screen playback with custom controls
+- Playback speed adjustment
+
+### Casting Support
+The application supports multiple casting protocols:
+- **Chromecast**: Native Google Cast SDK integration
+- **DLNA**: UPnP-based media streaming
+- **Miracast**: WiFi Direct screen mirroring
+
+### Multi-platform Support
+- Android (primary target)
+- iOS
+- Web
+- Windows/Linux/macOS desktop
 
 ## Getting Started
 

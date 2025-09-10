@@ -11,6 +11,7 @@ import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video_detail.dart';
 import 'package:mtv_app/src/core/services/cast_service.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
+import 'package:mtv_app/src/features/movies/presentation/pages/cast_control_page.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/video_player_widget.dart';
 
 class VideoPlayerPage extends StatefulWidget {
@@ -247,7 +248,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       final source = currentSource.source ?? widget.videoSource;
       final id = currentSource.id;
       print('使用当前源信息: source=$source, id=$id');
-      
+
       context.read<MovieBloc>().add(
             GetVideoDetailEvent(source, id),
           );
@@ -263,7 +264,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
           }
           print('=========================\n');
-          
+
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -276,7 +277,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     } else {
       // 使用传入的参数
       print('使用Widget传入参数: source=${widget.videoSource}, id=${widget.videoId}');
-      
+
       context.read<MovieBloc>().add(
             GetVideoDetailEvent(widget.videoSource, widget.videoId),
           );
@@ -291,7 +292,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
           }
           print('=========================\n');
-          
+
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -313,16 +314,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       print('传入的videoUrl: $videoUrl');
       print('当前选择的剧集索引: $_currentEpisodeIndex');
       print('总剧集数量: ${_episodes.length}');
-      
+
       // 验证URL有效性
       if (videoUrl.isEmpty) {
         throw Exception('视频URL为空');
       }
-      
+
       if (!videoUrl.startsWith('http')) {
         throw Exception('无效的视频URL格式: $videoUrl');
       }
-      
+
       print('使用实际播放地址: $videoUrl');
       print('======================\n');
 
@@ -875,8 +876,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             trackHeight: 3,
                             thumbShape: const RoundSliderThumbShape(
                                 enabledThumbRadius: 8),
-                            overlayShape:
-                                const RoundSliderOverlayShape(overlayRadius: 16),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 16),
                             activeTrackColor: Colors.orange,
                             inactiveTrackColor: Colors.grey,
                             thumbColor: Colors.orange,
@@ -985,10 +986,45 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         title: widget.title,
         poster: _videoDetail?.poster,
         currentTime: _position.inSeconds,
+        onDeviceConnected: (device) {
+          // 投屏成功后的处理
+          _onCastConnected(device);
+        },
       ),
     ).then((_) {
       // 投屏选择器关闭后，检查投屏状态
       _checkCastingStatus();
     });
+  }
+
+  // 投屏成功后的处理
+  void _onCastConnected(CastDevice device) {
+    // 停止本地播放
+    _playerController.pause();
+
+    // 跨转到投屏管理页面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CastControlPage(
+          videoUrl: _currentVideoUrl!,
+          title: widget.title,
+          poster: _videoDetail?.poster,
+          connectedDevice: device,
+          onCastStopped: () {
+            // 投屏停止后的处理
+            _onCastStopped();
+          },
+        ),
+      ),
+    );
+  }
+
+  // 投屏停止后的处理
+  void _onCastStopped() {
+    setState(() {
+      _isCasting = false;
+    });
+    // 可以选择继续本地播放
+    // _playerController.play();
   }
 }
