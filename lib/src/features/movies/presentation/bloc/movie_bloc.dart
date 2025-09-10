@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_categories.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_sources.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_detail.dart';
@@ -10,6 +11,7 @@ import 'package:mtv_app/src/features/movies/presentation/bloc/movie_state.dart';
 class MovieBloc extends Bloc<MovieEvent, MovieState> {
   final GetPopularMovies getPopularMovies;
   final GetDoubanMovies getDoubanMovies;
+  final GetDoubanCategories getDoubanCategories;
   final SearchVideos searchVideos;
   final GetVideoSources getVideoSources;
   final GetVideoDetail getVideoDetail;
@@ -17,12 +19,14 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
   MovieBloc({
     required this.getPopularMovies,
     required this.getDoubanMovies,
+    required this.getDoubanCategories,
     required this.searchVideos,
     required this.getVideoSources,
     required this.getVideoDetail,
   }) : super(MovieInitial()) {
     on<FetchPopularMovies>(_onFetchPopularMovies);
     on<FetchDoubanMovies>(_onFetchDoubanMovies);
+    on<FetchDoubanCategories>(_onFetchDoubanCategories);
     on<SearchVideosEvent>(_onSearchVideos);
     on<FetchVideoSources>(_onFetchVideoSources);
     on<SelectCategory>(_onSelectCategory);
@@ -65,6 +69,32 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     } catch (e) {
       print('Error fetching douban movies: $e');
       emit(MovieError(message: 'Failed to fetch douban movies: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onFetchDoubanCategories(
+    FetchDoubanCategories event,
+    Emitter<MovieState> emit,
+  ) async {
+    emit(MovieLoading());
+    try {
+      print('Fetching douban categories: kind=${event.kind}, category=${event.category}, type=${event.type}');
+      final movies = await getDoubanCategories(
+        kind: event.kind,
+        category: event.category,
+        type: event.type,
+        limit: event.limit,
+        start: event.start,
+      );
+      print('Received ${movies.length} movies from categories');
+      emit(DoubanMoviesLoaded(
+        movies: movies,
+        category: event.type,
+        type: event.category,
+      ));
+    } catch (e) {
+      print('Error fetching douban categories: $e');
+      emit(MovieError(message: 'Failed to fetch douban categories: ${e.toString()}'));
     }
   }
 

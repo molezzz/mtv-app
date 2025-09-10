@@ -12,28 +12,69 @@ import 'package:mtv_app/l10n/app_localizations.dart';
 import 'package:mtv_app/src/features/settings/presentation/pages/settings_page.dart';
 import 'package:mtv_app/src/core/widgets/language_selector.dart';
 
-class MoviesPage extends StatefulWidget {
-  const MoviesPage({super.key});
+class MediaListPage extends StatefulWidget {
+  final String mediaType; // 'movie', 'tv', 'show'
+  final String title;
+  final String defaultCategory;
+  final String categoryType; // 'movie', 'tv', 'show'
+
+  const MediaListPage({
+    super.key,
+    required this.mediaType,
+    required this.title,
+    this.defaultCategory = '热门',
+    this.categoryType = 'movie',
+  });
 
   @override
-  State<MoviesPage> createState() => _MoviesPageState();
+  State<MediaListPage> createState() => _MediaListPageState();
 }
 
-class _MoviesPageState extends State<MoviesPage> {
-  String _selectedCategory = '热门';
+class _MediaListPageState extends State<MediaListPage> {
+  String _selectedCategory = '';
   String _searchQuery = '';
   bool _isSearchMode = false;
 
   @override
   void initState() {
     super.initState();
-    // 默认加载热门电影
-    context.read<MovieBloc>().add(
-      const FetchDoubanMovies(
-        type: 'movie',
-        tag: '热门',
-      ),
-    );
+    _selectedCategory = widget.defaultCategory;
+    // 默认加载数据
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
+    if (widget.mediaType == 'tv') {
+      // 剧集使用新的API端点
+      context.read<MovieBloc>().add(
+        FetchDoubanCategories(
+          kind: 'tv',
+          category: 'tv',
+          type: 'tv',
+          limit: 25,
+          start: 0,
+        ),
+      );
+    } else if (widget.mediaType == 'show') {
+      // 综艺使用新的API端点
+      context.read<MovieBloc>().add(
+        FetchDoubanCategories(
+          kind: 'tv',
+          category: 'show',
+          type: 'show',
+          limit: 25,
+          start: 0,
+        ),
+      );
+    } else {
+      // 电影使用原有的API端点
+      context.read<MovieBloc>().add(
+        FetchDoubanMovies(
+          type: widget.categoryType,
+          tag: _selectedCategory,
+        ),
+      );
+    }
   }
 
   void _onCategorySelected(String category, String type) {
@@ -42,12 +83,35 @@ class _MoviesPageState extends State<MoviesPage> {
       _isSearchMode = false;
       _searchQuery = '';
     });
-    context.read<MovieBloc>().add(
-      SelectCategory(
-        category: category,
-        type: type,
-      ),
-    );
+    
+    if (widget.mediaType == 'tv') {
+      context.read<MovieBloc>().add(
+        FetchDoubanCategories(
+          kind: 'tv',
+          category: 'tv',
+          type: category, // 这里使用category作为type参数
+          limit: 25,
+          start: 0,
+        ),
+      );
+    } else if (widget.mediaType == 'show') {
+      context.read<MovieBloc>().add(
+        FetchDoubanCategories(
+          kind: 'tv',
+          category: 'show',
+          type: category, // 这里使用category作为type参数
+          limit: 25,
+          start: 0,
+        ),
+      );
+    } else {
+      context.read<MovieBloc>().add(
+        SelectCategory(
+          category: category,
+          type: type,
+        ),
+      );
+    }
   }
 
   void _onSearch(String query) {
@@ -57,12 +121,7 @@ class _MoviesPageState extends State<MoviesPage> {
         _searchQuery = '';
       });
       // 返回到分类模式
-      context.read<MovieBloc>().add(
-        SelectCategory(
-          category: _selectedCategory,
-          type: 'movie',
-        ),
-      );
+      _loadInitialData();
     } else {
       setState(() {
         _isSearchMode = true;
@@ -81,7 +140,7 @@ class _MoviesPageState extends State<MoviesPage> {
         title: Text(
           _isSearchMode 
               ? '搜索结果'
-              : AppLocalizations.of(context)?.popularMovies ?? 'Popular Movies',
+              : widget.title,
         ),
         actions: [
           const LanguageSelector(),
@@ -115,7 +174,7 @@ class _MoviesPageState extends State<MoviesPage> {
                 CategorySelector(
                   selectedCategory: _selectedCategory,
                   onCategorySelected: _onCategorySelected,
-                  type: 'movie', // 指定类型为电影
+                  type: widget.categoryType,
                 ),
             ],
           ),
@@ -196,12 +255,7 @@ class _MoviesPageState extends State<MoviesPage> {
                       if (_isSearchMode && _searchQuery.isNotEmpty) {
                         context.read<MovieBloc>().add(SearchVideosEvent(_searchQuery));
                       } else {
-                        context.read<MovieBloc>().add(
-                          SelectCategory(
-                            category: _selectedCategory,
-                            type: 'movie',
-                          ),
-                        );
+                        _loadInitialData();
                       }
                     },
                     child: Text(AppLocalizations.of(context)?.retry ?? 'Retry'),
@@ -248,7 +302,7 @@ class _MoviesPageState extends State<MoviesPage> {
             Text(
               _isSearchMode 
                   ? '没有找到相关内容'
-                  : '暂无电影数据',
+                  : '暂无数据',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.grey[600],
               ),

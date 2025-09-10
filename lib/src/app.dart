@@ -6,6 +6,7 @@ import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_s
 import 'package:mtv_app/src/features/movies/data/repositories/movie_repository_impl.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_popular_movies.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_movies.dart';
+import 'package:mtv_app/src/features/movies/domain/usecases/get_douban_categories.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/search_videos.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_sources.dart';
 import 'package:mtv_app/src/features/movies/domain/usecases/get_video_detail.dart';
@@ -146,6 +147,7 @@ class _AppState extends State<App> {
                     return MovieBloc(
                       getPopularMovies: GetPopularMovies(repository),
                       getDoubanMovies: GetDoubanMovies(repository),
+                      getDoubanCategories: GetDoubanCategories(repository),
                       searchVideos: SearchVideos(repository),
                       getVideoSources: GetVideoSources(repository),
                       getVideoDetail: GetVideoDetail(repository),

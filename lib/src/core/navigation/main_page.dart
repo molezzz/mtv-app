@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
 import 'package:mtv_app/src/features/movies/presentation/pages/home_page.dart';
+import 'package:mtv_app/src/features/movies/presentation/pages/variety_shows_page.dart';
 import 'package:mtv_app/src/features/tv_shows/presentation/pages/tv_shows_page.dart';
 import 'package:mtv_app/src/features/records/presentation/pages/records_page.dart';
 import 'package:mtv_app/src/features/favorites/presentation/pages/favorites_page.dart';
@@ -18,6 +19,7 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     const MoviesPage(),
     const TvShowsPage(),
+    const VarietyShowsPage(),
     const RecordsPage(),
     const FavoritesPage(),
   ];
@@ -27,10 +29,9 @@ class _MainPageState extends State<MainPage> {
     final localizations = AppLocalizations.of(context);
     
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      // Use only the current page instead of IndexedStack so each tab rebuilds
+      // and triggers its own initial data load, avoiding shared Bloc state bleed.
+      body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
@@ -50,6 +51,10 @@ class _MainPageState extends State<MainPage> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.tv),
             label: localizations?.tvShows ?? 'TV Shows',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.music_video),
+            label: localizations?.varietyShows ?? 'Variety Shows',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.history),

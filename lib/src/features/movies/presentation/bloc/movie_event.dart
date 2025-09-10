@@ -26,6 +26,25 @@ class FetchDoubanMovies extends MovieEvent {
   List<Object> get props => [type, tag, pageSize, pageStart];
 }
 
+class FetchDoubanCategories extends MovieEvent {
+  final String kind;
+  final String category;
+  final String type;
+  final int limit;
+  final int start;
+
+  const FetchDoubanCategories({
+    required this.kind,
+    required this.category,
+    required this.type,
+    this.limit = 25,
+    this.start = 0,
+  });
+
+  @override
+  List<Object> get props => [kind, category, type, limit, start];
+}
+
 class SearchVideosEvent extends MovieEvent {
   final String query;
 

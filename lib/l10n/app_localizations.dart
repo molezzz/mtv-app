@@ -207,6 +207,16 @@ class AppLocalizations {
     }
   }
 
+  String get varietyShows {
+    switch (localeName) {
+      case 'zh':
+        return '综艺';
+      case 'en':
+      default:
+        return 'Variety Shows';
+    }
+  }
+
   String get records {
     switch (localeName) {
       case 'zh':

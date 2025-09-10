@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class CategorySelector extends StatelessWidget {
   final String selectedCategory;
   final Function(String, String) onCategorySelected;
+  final String type; // 新增type参数
 
   const CategorySelector({
     super.key,
     required this.selectedCategory,
     required this.onCategorySelected,
+    this.type = 'movie', // 默认为电影类型
   });
 
   // 预定义的电影分类
@@ -24,27 +26,49 @@ class CategorySelector extends StatelessWidget {
     {'name': '动画', 'tag': '动画', 'type': 'movie'},
   ];
 
+  // 预定义的剧集分类
   static const List<Map<String, String>> tvCategories = [
-    {'name': '热门剧集', 'tag': '热门', 'type': 'tv'},
-    {'name': '最新剧集', 'tag': '最新', 'type': 'tv'},
-    {'name': '综艺', 'tag': '综艺', 'type': 'tv'},
-    {'name': '纪录片', 'tag': '纪录片', 'type': 'tv'},
-    {'name': '国产剧', 'tag': '国产剧', 'type': 'tv'},
-    {'name': '美剧', 'tag': '美剧', 'type': 'tv'},
-    {'name': '韩剧', 'tag': '韩剧', 'type': 'tv'},
-    {'name': '日剧', 'tag': '日剧', 'type': 'tv'},
+    {'name': '热门', 'tag': 'hot_gaia', 'type': 'tv'},
+    {'name': '最新', 'tag': 'now_playing', 'type': 'tv'},
+    {'name': '高分', 'tag': 'top_gaia', 'type': 'tv'},
+    {'name': '国产剧', 'tag': 'domestic', 'type': 'tv'},
+    {'name': '美剧', 'tag': 'american', 'type': 'tv'},
+    {'name': '韩剧', 'tag': 'korean', 'type': 'tv'},
+    {'name': '日剧', 'tag': 'japanese', 'type': 'tv'},
+    {'name': '英剧', 'tag': 'british', 'type': 'tv'},
+  ];
+
+  // 预定义的综艺分类
+  static const List<Map<String, String>> showCategories = [
+    {'name': '热门', 'tag': 'hot_gaia', 'type': 'show'},
+    {'name': '最新', 'tag': 'now_playing', 'type': 'show'},
+    {'name': '高分', 'tag': 'top_gaia', 'type': 'show'},
+    {'name': '大陆综艺', 'tag': 'domestic', 'type': 'show'},
+    {'name': '港台综艺', 'tag': 'hktw', 'type': 'show'},
+    {'name': '日韩综艺', 'tag': 'korean', 'type': 'show'},
+    {'name': '欧美综艺', 'tag': 'western', 'type': 'show'},
   ];
 
   @override
   Widget build(BuildContext context) {
+    // 根据type选择分类列表
+    List<Map<String, String>> categories;
+    if (type == 'tv') {
+      categories = tvCategories;
+    } else if (type == 'show') {
+      categories = showCategories;
+    } else {
+      categories = movieCategories;
+    }
+    
     return SizedBox(
       height: 50,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: movieCategories.length,
+        itemCount: categories.length,
         itemBuilder: (context, index) {
-          final category = movieCategories[index];
+          final category = categories[index];
           final isSelected = selectedCategory == category['tag'];
           
           return Padding(

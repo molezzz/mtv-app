@@ -73,7 +73,7 @@ class _FPlayerVideoWidgetState extends State<FPlayerVideoWidget> {
   bool _hasError = false;
   String? _errorMessage;
   Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
+  final Duration _position = Duration.zero;
   double _currentSpeed = 1.0;
 
   @override
@@ -121,7 +121,6 @@ class _FPlayerVideoWidgetState extends State<FPlayerVideoWidget> {
 
       print('FPlayer 初始化成功！');
       print('======================\n');
-
     } catch (e) {
       print('FPlayer 初始化失败: $e');
       setState(() {
@@ -138,7 +137,7 @@ class _FPlayerVideoWidgetState extends State<FPlayerVideoWidget> {
     await _fPlayer.setOption(FOption.hostCategory, "enable-snapshot", 1);
     await _fPlayer.setOption(FOption.hostCategory, "request-screen-on", 1);
     await _fPlayer.setOption(FOption.hostCategory, "request-audio-focus", 1);
-    
+
     // 网络和缓冲配置
     await _fPlayer.setOption(FOption.playerCategory, "reconnect", 20);
     await _fPlayer.setOption(FOption.playerCategory, "framedrop", 20);
@@ -146,7 +145,7 @@ class _FPlayerVideoWidgetState extends State<FPlayerVideoWidget> {
     await _fPlayer.setOption(FOption.playerCategory, "mediacodec", 1);
     await _fPlayer.setOption(FOption.playerCategory, "packet-buffering", 0);
     await _fPlayer.setOption(FOption.playerCategory, "soundtouch", 1);
-    
+
     print('FPlayer 配置选项设置完成');
   }
 
@@ -193,7 +192,8 @@ class _FPlayerVideoWidgetState extends State<FPlayerVideoWidget> {
 
       // 处理错误
       if (state == FState.error) {
-        final errorMsg = 'FPlayer 播放错误: ${value.exception?.toString() ?? "未知错误"}';
+        final errorMsg =
+            'FPlayer 播放错误: ${value.exception.toString() ?? "未知错误"}';
         setState(() {
           _hasError = true;
           _errorMessage = errorMsg;

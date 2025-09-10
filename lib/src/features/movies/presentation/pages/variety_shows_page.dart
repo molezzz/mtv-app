@@ -6,14 +6,14 @@ import 'package:mtv_app/src/features/movies/presentation/bloc/movie_bloc.dart';
 import 'package:mtv_app/src/features/movies/presentation/pages/media_list_page.dart';
 import 'package:mtv_app/src/features/settings/presentation/pages/settings_page.dart';
 
-class TvShowsPage extends StatefulWidget {
-  const TvShowsPage({super.key});
+class VarietyShowsPage extends StatefulWidget {
+  const VarietyShowsPage({super.key});
 
   @override
-  State<TvShowsPage> createState() => _TvShowsPageState();
+  State<VarietyShowsPage> createState() => _VarietyShowsPageState();
 }
 
-class _TvShowsPageState extends State<TvShowsPage> {
+class _VarietyShowsPageState extends State<VarietyShowsPage> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -22,10 +22,10 @@ class _TvShowsPageState extends State<TvShowsPage> {
     return BlocProvider.value(
       value: context.read<MovieBloc>(),
       child: MediaListPage(
-        mediaType: 'tv',
-        title: localizations?.tvShows ?? 'TV Shows',
-        defaultCategory: 'tv',
-        categoryType: 'tv',
+        mediaType: 'show',
+        title: localizations?.varietyShows ?? 'Variety Shows',
+        defaultCategory: 'show',
+        categoryType: 'show',
       ),
     );
   }
