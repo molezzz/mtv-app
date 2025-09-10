@@ -32,7 +32,8 @@ class _RecordsPageState extends State<RecordsPage> {
   Future<void> _initializeDataSource() async {
     final prefs = await SharedPreferences.getInstance();
     // 修复：使用正确的键名 'api_server_address' 而不是 'server_url'
-    final serverUrl = prefs.getString('api_server_address') ?? 'http://localhost:3000';
+    final serverUrl =
+        prefs.getString('api_server_address') ?? 'http://localhost:3000';
     final apiClient = ApiClient(baseUrl: serverUrl);
     _dataSource = MovieRemoteDataSourceImpl(apiClient);
   }
@@ -40,7 +41,7 @@ class _RecordsPageState extends State<RecordsPage> {
   Future<void> _loadPlayRecords() async {
     // 检查组件是否仍然挂载
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -50,7 +51,7 @@ class _RecordsPageState extends State<RecordsPage> {
       final records = await _dataSource.getPlayRecords();
       // 再次检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       setState(() {
         _playRecords = records;
         _isLoading = false;
@@ -58,7 +59,7 @@ class _RecordsPageState extends State<RecordsPage> {
     } catch (e) {
       // 检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       setState(() {
         _hasError = true;
         _errorMessage = e.toString();
@@ -70,7 +71,7 @@ class _RecordsPageState extends State<RecordsPage> {
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations?.records ?? 'Records'),
@@ -147,7 +148,10 @@ class _RecordsPageState extends State<RecordsPage> {
                           const SizedBox(height: 16),
                           Text(
                             localizations?.noRecords ?? 'No records yet',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
                                   color: Colors.grey,
                                 ),
                           ),
@@ -156,7 +160,8 @@ class _RecordsPageState extends State<RecordsPage> {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(16),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         childAspectRatio: 0.7,
                         crossAxisSpacing: 12,
@@ -166,18 +171,18 @@ class _RecordsPageState extends State<RecordsPage> {
                       itemBuilder: (context, index) {
                         final recordKey = _playRecords.keys.elementAt(index);
                         final record = _playRecords[recordKey]!;
-                        
+
                         return _buildRecordCard(record, localizations);
                       },
                     ),
     );
   }
 
-  Widget _buildRecordCard(PlayRecordModel record, AppLocalizations? localizations) {
-    final progress = record.totalTime > 0 
-        ? record.playTime / record.totalTime 
-        : 0.0;
-    
+  Widget _buildRecordCard(
+      PlayRecordModel record, AppLocalizations? localizations) {
+    final progress =
+        record.totalTime > 0 ? record.playTime / record.totalTime : 0.0;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -190,7 +195,8 @@ class _RecordsPageState extends State<RecordsPage> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
                 image: record.cover.isNotEmpty
                     ? DecorationImage(
                         image: NetworkImage(record.cover),
@@ -238,7 +244,9 @@ class _RecordsPageState extends State<RecordsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  record.sourceName.isNotEmpty ? record.sourceName : 'Unknown Source',
+                  record.sourceName.isNotEmpty
+                      ? record.sourceName
+                      : 'Unknown Source',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

@@ -20,6 +20,12 @@ import 'package:mtv_app/src/core/locale_notifier.dart';
 import 'package:mtv_app/src/core/auth/auth_notifier.dart';
 import 'package:mtv_app/src/features/settings/presentation/widgets/login_dialog.dart';
 import 'package:mtv_app/src/features/settings/presentation/pages/settings_page.dart';
+import 'package:mtv_app/src/features/favorites/data/datasources/favorite_remote_data_source.dart';
+import 'package:mtv_app/src/features/favorites/data/repositories/favorite_repository_impl.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorites.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/delete_favorite.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/add_favorite.dart';
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -131,30 +137,53 @@ class _AppState extends State<App> {
               Locale('zh', ''), // Chinese
             ],
             locale: localeNotifier.locale ?? const Locale('zh', ''),
+            // 将 Bloc Providers 提升到 Navigator 之上，确保新路由也能获取到
+            builder: (context, child) {
+              final authNotifier = Provider.of<AuthNotifier>(context);
+              if (!authNotifier.isAuthenticated) {
+                return child!;
+              }
+              return MultiBlocProvider(
+                providers: [
+                  BlocProvider(
+                    create: (context) {
+                      final repository = MovieRepositoryImpl(
+                        remoteDataSource: MovieRemoteDataSourceImpl(_apiClient!),
+                      );
+                      return MovieBloc(
+                        getPopularMovies: GetPopularMovies(repository),
+                        getDoubanMovies: GetDoubanMovies(repository),
+                        getDoubanCategories: GetDoubanCategories(repository),
+                        searchVideos: SearchVideos(repository),
+                        getVideoSources: GetVideoSources(repository),
+                        getVideoDetail: GetVideoDetail(repository),
+                      );
+                    },
+                  ),
+                  BlocProvider(
+                    create: (context) {
+                      final favoriteRemoteDataSource =
+                          FavoriteRemoteDataSourceImpl(_apiClient!);
+                      final favoriteRepository = FavoriteRepositoryImpl(
+                          remoteDataSource: favoriteRemoteDataSource);
+                      return FavoriteBloc(
+                        getFavorites: GetFavorites(favoriteRepository),
+                        deleteFavorite: DeleteFavorite(favoriteRepository),
+                        addFavorite: AddFavorite(favoriteRepository),
+                      );
+                    },
+                  ),
+                ],
+                child: child!,
+              );
+            },
             home: Consumer<AuthNotifier>(
               builder: (context, authNotifier, child) {
-                // Check if user is authenticated
+                // 未登录时显示认证页面，登录后直接显示主页面
                 if (!authNotifier.isAuthenticated) {
                   return const _AuthRequiredScreen();
                 }
-
-                // User is authenticated, show main app
-                return BlocProvider(
-                  create: (context) {
-                    final repository = MovieRepositoryImpl(
-                      remoteDataSource: MovieRemoteDataSourceImpl(_apiClient!),
-                    );
-                    return MovieBloc(
-                      getPopularMovies: GetPopularMovies(repository),
-                      getDoubanMovies: GetDoubanMovies(repository),
-                      getDoubanCategories: GetDoubanCategories(repository),
-                      searchVideos: SearchVideos(repository),
-                      getVideoSources: GetVideoSources(repository),
-                      getVideoDetail: GetVideoDetail(repository),
-                    );
-                  },
-                  child: const MainPage(),
-                );
+                return const MainPage();
               },
             ),
           );

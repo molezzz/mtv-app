@@ -16,6 +16,10 @@ import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_s
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart'
+    as favorite_event;
+import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final String? source;
@@ -41,10 +45,12 @@ class MovieDetailPage extends StatefulWidget {
 
 class _MovieDetailPageState extends State<MovieDetailPage> {
   MovieBloc? _movieBloc;
+  FavoriteBloc? _favoriteBloc;
   bool _isInitialized = false;
   List<Video> _videoSources = [];
   Video? _selectedVideo;
   bool _dataLoaded = false; // 标记数据是否已加载
+  bool _isFavorite = false; // 标记是否已收藏
 
   @override
   void initState() {
@@ -79,6 +85,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             getVideoSources: GetVideoSources(repository),
             getVideoDetail: GetVideoDetail(repository),
           );
+          // 获取 FavoriteBloc
+          _favoriteBloc = context.read<FavoriteBloc>();
           _isInitialized = true;
         });
 
@@ -154,26 +162,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(
-                Icons.share,
-                color: Colors.white,
+              icon: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? Colors.red : Colors.white,
               ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('分享功能')),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.favorite_border,
-                color: Colors.white,
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('收藏功能')),
-                );
-              },
+              onPressed: _toggleFavorite,
             ),
           ],
         ),
@@ -218,6 +211,44 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         ),
       ),
     );
+  }
+
+  // 添加收藏/取消收藏的方法
+  void _toggleFavorite() {
+    if (_selectedVideo == null) return;
+
+    final favorite = Favorite(
+      cover: _selectedVideo!.pic ?? '',
+      title: _selectedVideo!.title ?? widget.title ?? '未知标题',
+      sourceName:
+          _selectedVideo!.sourceName ?? _selectedVideo!.source ?? '未知来源',
+      totalEpisodes: 1, // 默认 1 集；如有实际集数可替换
+      searchTitle: _selectedVideo!.title ?? widget.title ?? '',
+      year: _selectedVideo!.year ?? '',
+      saveTime: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+
+    if (_isFavorite) {
+      // 取消收藏
+      _favoriteBloc?.add(favorite_event.DeleteFavorite(key));
+      setState(() {
+        _isFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已取消收藏')),
+      );
+    } else {
+      // 添加收藏
+      _favoriteBloc?.add(favorite_event.AddFavorite(key, favorite));
+      setState(() {
+        _isFavorite = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已添加到收藏')),
+      );
+    }
   }
 
   Widget _buildVideoDetail() {

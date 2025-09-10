@@ -103,7 +103,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void _initializeDataSource() async {
     final prefs = await SharedPreferences.getInstance();
     // 修复：使用正确的键名 'api_server_address' 而不是 'server_url'
-    final serverUrl = prefs.getString('api_server_address') ?? 'http://localhost:3000';
+    final serverUrl =
+        prefs.getString('api_server_address') ?? 'http://localhost:3000';
     final apiClient = ApiClient(baseUrl: serverUrl);
     _dataSource = MovieRemoteDataSourceImpl(apiClient);
   }
@@ -185,8 +186,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   void _onSeekStart(double value) {
     // 开始拖动时设置拖动状态并显示控制栏
-    final startPosition = Duration(
-        milliseconds: (value * _duration.inMilliseconds).round());
+    final startPosition =
+        Duration(milliseconds: (value * _duration.inMilliseconds).round());
     setState(() {
       _isSeeking = true;
       _seekTarget = null;
@@ -389,7 +390,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         _isLoading = false;
         _hasError = false;
       });
-      
+
       // 启动播放记录定时器
       _startPlayRecordTimer();
     } catch (e) {
@@ -439,7 +440,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (index >= 0 && index < _episodes.length) {
       // 切换集数前先保存当前播放记录
       _savePlayRecord();
-      
+
       setState(() {
         _currentEpisodeIndex = index;
       });
@@ -453,7 +454,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         sourceIndex < _videoSources!.length) {
       // 切换源前先保存当前播放记录
       _savePlayRecord();
-      
+
       setState(() {
         _currentSourceIndex = sourceIndex;
         _currentEpisodeIndex = 0; // 重置到第一集
@@ -735,7 +736,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   // 如果在等待跳转完成，则当当前位置接近目标时结束拖动/缓冲状态
                   if (_isSeeking && _seekTarget != null) {
                     final diff = (position - _seekTarget!).inMilliseconds.abs();
-                    if (diff <= 800) { // 允许一定误差
+                    if (diff <= 800) {
+                      // 允许一定误差
                       setState(() {
                         _isSeeking = false;
                         _isBuffering = false;
@@ -813,7 +815,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ],
                 ),
               ),
-
 
             // 自定义控制栏（放在最上层，确保按钮可以点击）
             if (_isControlsVisible) ..._buildControls(),
@@ -1024,7 +1025,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 Row(
                   children: [
                     Text(
-                      _formatDuration(_isSeeking ? (_dragPosition ?? _position) : _position),
+                      _formatDuration(_isSeeking
+                          ? (_dragPosition ?? _position)
+                          : _position),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                     const SizedBox(width: 8),
@@ -1047,7 +1050,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               ),
                               child: Slider(
                                 value: _duration.inMilliseconds > 0
-                                    ? ((_isSeeking ? (_dragPosition ?? _position) : _position).inMilliseconds /
+                                    ? ((_isSeeking
+                                                ? (_dragPosition ?? _position)
+                                                : _position)
+                                            .inMilliseconds /
                                         _duration.inMilliseconds)
                                     : 0.0,
                                 onChanged: _onSeekChanged,
@@ -1061,7 +1067,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             Positioned(
                               right: 0,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.black87,
                                   borderRadius: BorderRadius.circular(12),
@@ -1074,7 +1081,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                                       height: 12,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.orange),
                                       ),
                                     ),
                                     SizedBox(width: 4),

@@ -36,16 +36,17 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
     try {
       // 检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = true;
         _error = null;
       });
 
       String imageUrl = widget.imageUrl;
-      
+
       // 如果是豆瓣图片且不是代理URL，转换为代理URL
-      if (imageUrl.contains('doubanio.com') && !imageUrl.contains('/api/image-proxy')) {
+      if (imageUrl.contains('doubanio.com') &&
+          !imageUrl.contains('/api/image-proxy')) {
         final encodedUrl = Uri.encodeComponent(imageUrl);
         imageUrl = 'https://tv.lightndust.cn/api/image-proxy?url=$encodedUrl';
         print('Using proxy URL: $imageUrl');
@@ -57,15 +58,16 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
           receiveTimeout: const Duration(seconds: 30),
         ),
       );
-      
+
       // 添加认证Cookie
       final prefs = await SharedPreferences.getInstance();
       final authCookie = prefs.getString('auth_cookie');
-      
+
       final headers = <String, String>{
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       };
-      
+
       if (authCookie != null && authCookie.isNotEmpty) {
         headers['Cookie'] = authCookie;
       }
@@ -80,7 +82,7 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
 
       // 检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       if (response.statusCode == 200) {
         setState(() {
           _imageData = Uint8List.fromList(response.data);
@@ -93,7 +95,7 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
       print('Image load error: $e');
       // 检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       setState(() {
         _error = e.toString();
         _isLoading = false;

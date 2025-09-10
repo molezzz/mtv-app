@@ -11,11 +11,12 @@ class AppLocalizations {
   final String localeName;
 
   static Future<AppLocalizations> load(Locale locale) {
-    final String name = locale.countryCode == null || locale.countryCode!.isEmpty
-        ? locale.languageCode
-        : locale.toString();
+    final String name =
+        locale.countryCode == null || locale.countryCode!.isEmpty
+            ? locale.languageCode
+            : locale.toString();
     final String localeName = Intl.canonicalizedLocale(name);
-    
+
     return Future.value(AppLocalizations(localeName));
   }
 
@@ -264,6 +265,26 @@ class AppLocalizations {
       case 'en':
       default:
         return 'Your Favorite Content';
+    }
+  }
+
+  String get delete {
+    switch (localeName) {
+      case 'zh':
+        return '删除';
+      case 'en':
+      default:
+        return 'Delete';
+    }
+  }
+
+  String get confirmDelete {
+    switch (localeName) {
+      case 'zh':
+        return '确定要删除';
+      case 'en':
+      default:
+        return 'Are you sure you want to delete';
     }
   }
 

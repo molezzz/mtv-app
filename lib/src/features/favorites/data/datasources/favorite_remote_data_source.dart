@@ -1,0 +1,71 @@
+import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:mtv_app/src/core/api/api_client.dart';
+import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
+
+abstract class FavoriteRemoteDataSource {
+  Future<List<Favorite>> getFavorites();
+  Future<bool> addFavorite(String key, Favorite favorite);
+  Future<bool> deleteFavorite(String key);
+}
+
+class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
+  final ApiClient apiClient;
+
+  FavoriteRemoteDataSourceImpl(this.apiClient);
+
+  @override
+  Future<List<Favorite>> getFavorites() async {
+    try {
+      final response = await apiClient.dio.get('/api/favorites');
+      final data = response.data as Map<String, dynamic>;
+
+      List<Favorite> favorites = [];
+      data.forEach((key, value) {
+        if (value is Map<String, dynamic>) {
+          final favorite = Favorite.fromJson(value);
+          favorites.add(favorite);
+        }
+      });
+
+      return favorites;
+    } on DioException catch (e) {
+      throw Exception('Failed to load favorites: ${e.message}');
+    }
+  }
+
+  @override
+  Future<bool> addFavorite(String key, Favorite favorite) async {
+    try {
+      final data = {
+        'key': key,
+        'favorite': favorite.toJson(),
+      };
+
+      final response = await apiClient.dio.post(
+        '/api/favorites',
+        data: data,
+      );
+
+      // 检查响应是否成功
+      if (response.statusCode == 200) {
+        final responseData = response.data as Map<String, dynamic>;
+        return responseData['success'] as bool? ?? false;
+      }
+
+      return false;
+    } on DioException catch (e) {
+      throw Exception('Failed to add favorite: ${e.message}');
+    }
+  }
+
+  @override
+  Future<bool> deleteFavorite(String key) async {
+    try {
+      await apiClient.dio.delete('/api/favorites?key=$key');
+      return true;
+    } on DioException catch (e) {
+      throw Exception('Failed to delete favorite: ${e.message}');
+    }
+  }
+}
