@@ -77,6 +77,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   Duration _position = Duration.zero;
   double _currentSpeed = 1.0;
   Timer? _positionTimer;
+  bool _isSeeking = false; // 添加一个标志来跟踪是否正在拖动进度条
 
   @override
   void initState() {
@@ -187,12 +188,23 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         }
       }
 
-      // 更新播放位置和时长
-      if (value.duration != _duration && value.duration > Duration.zero) {
-        setState(() {
-          _duration = value.duration;
-        });
-        widget.onDurationChanged?.call(_duration);
+      // 更新播放位置和时长（仅在非拖动状态下更新UI）
+      if (!_isSeeking) {
+        if (value.duration != _duration && value.duration > Duration.zero) {
+          setState(() {
+            _duration = value.duration;
+          });
+          widget.onDurationChanged?.call(_duration);
+        }
+
+        // 只有在非拖动状态时才更新位置，避免拖动时的跳动
+        final currentPos = _fPlayer.currentPos;
+        if (currentPos != _position) {
+          setState(() {
+            _position = currentPos;
+          });
+          widget.onPositionChanged?.call(_position);
+        }
       }
 
       // 处理播放完成
@@ -218,7 +230,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   void _startPositionTimer() {
     _stopPositionTimer(); // 确保没有重复的定时器
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (_fPlayer.state == FState.started) {
+      if (_fPlayer.state == FState.started && !_isSeeking) {
         // 使用 FPlayer 的当前位置
         final currentPos = _fPlayer.currentPos;
         if (currentPos != _position) {
@@ -263,9 +275,29 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   void seekTo(Duration position) async {
     try {
+      // 设置拖动状态
+      setState(() {
+        _isSeeking = true;
+        _position = position; // 立即更新UI显示
+      });
+
+      // 执行跳转
       await _fPlayer.seekTo(position.inMilliseconds);
+
+      // 跳转完成后重置状态，并通知位置变化
+      setState(() {
+        _isSeeking = false;
+      });
+
+      // 通知位置变化（跳转完成后）
+      widget.onPositionChanged?.call(position);
+
     } catch (e) {
       print('跳转失败: $e');
+      // 出错时也要重置状态
+      setState(() {
+        _isSeeking = false;
+      });
     }
   }
 

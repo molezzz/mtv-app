@@ -21,6 +21,7 @@ class VideoPlayerPage extends StatefulWidget {
   final String title;
   final List<Video>? videoSources;
   final int? selectedSourceIndex;
+  final VoidCallback? onVideoEnded; // 添加视频结束回调
 
   const VideoPlayerPage({
     super.key,
@@ -30,6 +31,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.title,
     this.videoSources,
     this.selectedSourceIndex,
+    this.onVideoEnded,
   });
 
   @override
@@ -57,6 +59,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _isFullScreen = true; // 默认全屏
   double _volume = 1.0; // 默认音量
   Timer? _hideControlsTimer; // 控制栏自动隐藏计时器
+  bool _isSeeking = false; // 是否正在拖动进度条
+  bool _isBuffering = false; // 是否正在缓冲
+  Duration? _seekTarget; // 期望跳转到的目标位置
+  Duration? _dragPosition; // UI层当前拖动的位置
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
@@ -104,7 +110,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _disposeControllers() {
-    // AliPlayer会在AliPlayerWidget的dispose方法中自动销毁
+    // FPlayer会在VideoPlayerWidget的dispose方法中自动销毁
   }
 
   // 控制栏显示/隐藏方法
@@ -152,8 +158,41 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void _onSeekChanged(double value) {
     final newPosition =
         Duration(milliseconds: (value * _duration.inMilliseconds).round());
-    _playerController.seekTo(newPosition);
+
+    // 拖动时只更新UI拖动位置，避免被真实播放位置覆盖
+    setState(() {
+      _dragPosition = newPosition;
+    });
     _showControls();
+  }
+
+  void _onSeekStart(double value) {
+    // 开始拖动时设置拖动状态并显示控制栏
+    final startPosition = Duration(
+        milliseconds: (value * _duration.inMilliseconds).round());
+    setState(() {
+      _isSeeking = true;
+      _seekTarget = null;
+      _dragPosition = startPosition;
+    });
+    _showControls();
+  }
+
+  void _onSeekEnd(double value) {
+    // 拖动结束时执行实际的跳转
+    final newPosition =
+        Duration(milliseconds: (value * _duration.inMilliseconds).round());
+
+    setState(() {
+      _isBuffering = true; // 显示缓冲状态
+      _seekTarget = newPosition; // 记录目标位置
+      _dragPosition = newPosition; // 松手时保持UI位置
+    });
+
+    _playerController.seekTo(newPosition);
+
+    // 不要立即将 _isSeeking 置为 false，等待位置接近目标后再清除
+    _resetHideControlsTimer();
   }
 
   void _toggleFullScreen() {
@@ -535,7 +574,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   setState(() {
                     _currentPlaybackSpeed = speed;
                   });
-                  // 通过AliPlayerController设置播放速度
+                  // 通过FPlayerController设置播放速度
                   _playerController.setPlaybackSpeed(speed);
                   Navigator.pop(context);
                 },
@@ -547,121 +586,178 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
+  Future<bool> _onWillPop() async {
+    // 恢复竖屏模式
+    _setScreenToPortrait();
+    // 返回true允许页面退出
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // 视频播放器
-          if (_isLoading)
-            const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.orange),
-                  SizedBox(height: 16),
-                  Text(
-                    '正在加载...',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            )
-          else if (_hasError)
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: 64,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '播放失败',
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _errorMessage ?? '未知错误',
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _initializeVideoPlayer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // 视频播放器
+            if (_isLoading)
+              const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.orange),
+                    SizedBox(height: 16),
+                    Text(
+                      '正在加载...',
+                      style: TextStyle(color: Colors.white),
                     ),
-                    child: const Text('重试'),
-                  ),
-                ],
+                  ],
+                ),
+              )
+            else if (_hasError)
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 64,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '播放失败',
+                      style: TextStyle(color: Colors.white, fontSize: 20),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMessage ?? '未知错误',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _initializeVideoPlayer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                      ),
+                      child: const Text('重试'),
+                    ),
+                  ],
+                ),
+              )
+            else if (_currentVideoUrl != null)
+              VideoPlayerWidget(
+                videoUrl: _currentVideoUrl!,
+                title: widget.title,
+                autoPlay: true,
+                showControls: false, // 使用自定义控制栏
+                playbackSpeeds: _playbackSpeeds,
+                controller: _playerController,
+                onInitialized: () {
+                  setState(() {
+                    _isLoading = false;
+                    _hasError = false;
+                  });
+                  _resetHideControlsTimer(); // 启动控制栏自动隐藏
+                },
+                onError: (error) {
+                  setState(() {
+                    _hasError = true;
+                    _errorMessage = error;
+                    _isLoading = false;
+                  });
+                },
+                onPositionChanged: (position) {
+                  // 如果在等待跳转完成，则当当前位置接近目标时结束拖动/缓冲状态
+                  if (_isSeeking && _seekTarget != null) {
+                    final diff = (position - _seekTarget!).inMilliseconds.abs();
+                    if (diff <= 800) { // 允许一定误差
+                      setState(() {
+                        _isSeeking = false;
+                        _isBuffering = false;
+                        _seekTarget = null;
+                        _dragPosition = null;
+                        _position = position; // 以播放器上报的位置为准
+                      });
+                      return;
+                    }
+                    // 未接近目标前不更新UI位置，保持停留在手松开的地方
+                    return;
+                  }
+                  // 正常更新位置
+                  if (!_isSeeking) {
+                    setState(() {
+                      _position = position;
+                      if (_isBuffering) {
+                        _isBuffering = false;
+                      }
+                    });
+                  }
+                },
+                onDurationChanged: (duration) {
+                  setState(() {
+                    _duration = duration;
+                  });
+                },
+                onPlayStateChanged: (isPlaying) {
+                  setState(() {
+                    _isPlaying = isPlaying;
+                    // 如果开始播放，重置缓冲状态
+                    if (isPlaying && _isBuffering) {
+                      _isBuffering = false;
+                    }
+                  });
+                  if (isPlaying) {
+                    _resetHideControlsTimer(); // 播放时自动隐藏控制栏
+                  }
+                },
+                onCompleted: () {
+                  // 视频播放完成时调用回调
+                  widget.onVideoEnded?.call();
+                },
+              )
+            else
+              const Center(
+                child: Text(
+                  '播放器未初始化',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
-            )
-          else if (_currentVideoUrl != null)
-            VideoPlayerWidget(
-              videoUrl: _currentVideoUrl!,
-              title: widget.title,
-              autoPlay: true,
-              showControls: false, // 使用自定义控制栏
-              playbackSpeeds: _playbackSpeeds,
-              controller: _playerController,
-              onInitialized: () {
-                setState(() {
-                  _isLoading = false;
-                  _hasError = false;
-                });
-                _resetHideControlsTimer(); // 启动控制栏自动隐藏
-              },
-              onError: (error) {
-                setState(() {
-                  _hasError = true;
-                  _errorMessage = error;
-                  _isLoading = false;
-                });
-              },
-              onPositionChanged: (position) {
-                setState(() {
-                  _position = position;
-                });
-              },
-              onDurationChanged: (duration) {
-                setState(() {
-                  _duration = duration;
-                });
-              },
-              onPlayStateChanged: (isPlaying) {
-                setState(() {
-                  _isPlaying = isPlaying;
-                });
-                if (isPlaying) {
-                  _resetHideControlsTimer(); // 播放时自动隐藏控制栏
-                }
-              },
-            )
-          else
-            const Center(
-              child: Text(
-                '播放器未初始化',
-                style: TextStyle(color: Colors.white),
+
+            // 点击区域控制显示/隐藏控制栏（放在控制栏下面，避免拦截按钮点击）
+            GestureDetector(
+              onTap: _toggleControls,
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.transparent,
               ),
             ),
 
-          // 点击区域控制显示/隐藏控制栏（放在控制栏下面，避免拦截按钮点击）
-          GestureDetector(
-            onTap: _toggleControls,
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.transparent,
-            ),
-          ),
+            // 拖动后暂停时的缓冲提示（视频未播放且处于缓冲）
+            if (_isBuffering && !_isPlaying)
+              const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.orange),
+                    SizedBox(height: 12),
+                    Text(
+                      '正在缓冲...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
 
-          // 自定义控制栏（放在最上层，确保按钮可以点击）
-          if (_isControlsVisible) ..._buildControls(),
-        ],
+
+            // 自定义控制栏（放在最上层，确保按钮可以点击）
+            if (_isControlsVisible) ..._buildControls(),
+          ],
+        ),
       ),
     );
   }
@@ -714,6 +810,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               // 返回按钮
               GestureDetector(
                 onTap: () {
+                  // 恢复竖屏模式并返回
+                  _setScreenToPortrait();
                   Navigator.pop(context);
                 },
                 behavior: HitTestBehavior.opaque,
@@ -864,32 +962,72 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 Row(
                   children: [
                     Text(
-                      _formatDuration(_position),
+                      _formatDuration(_isSeeking ? (_dragPosition ?? _position) : _position),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque, // 确保进度条可以被点击和拖动
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3,
-                            thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 8),
-                            overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 16),
-                            activeTrackColor: Colors.orange,
-                            inactiveTrackColor: Colors.grey,
-                            thumbColor: Colors.orange,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque, // 确保进度条可以被点击和拖动
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 8),
+                                overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 16),
+                                activeTrackColor: Colors.orange,
+                                inactiveTrackColor: Colors.grey,
+                                thumbColor: Colors.orange,
+                              ),
+                              child: Slider(
+                                value: _duration.inMilliseconds > 0
+                                    ? ((_isSeeking ? (_dragPosition ?? _position) : _position).inMilliseconds /
+                                        _duration.inMilliseconds)
+                                    : 0.0,
+                                onChanged: _onSeekChanged,
+                                onChangeStart: _onSeekStart, // 添加拖动开始回调
+                                onChangeEnd: _onSeekEnd, // 添加拖动结束回调
+                              ),
+                            ),
                           ),
-                          child: Slider(
-                            value: _duration.inMilliseconds > 0
-                                ? _position.inMilliseconds /
-                                    _duration.inMilliseconds
-                                : 0.0,
-                            onChanged: _onSeekChanged,
-                          ),
-                        ),
+                          // 缓冲状态指示器
+                          if (_isBuffering)
+                            Positioned(
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '缓冲中',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),

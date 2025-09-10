@@ -21,6 +21,8 @@ class MovieDetailPage extends StatefulWidget {
   final String? id;
   final String? title;
   final String? poster;
+  final List<Video>? videoSources; // 添加视频源参数
+  final int? selectedSourceIndex; // 添加选中的源索引参数
 
   const MovieDetailPage({
     super.key,
@@ -28,6 +30,8 @@ class MovieDetailPage extends StatefulWidget {
     this.id,
     required this.title,
     this.poster,
+    this.videoSources,
+    this.selectedSourceIndex,
   });
 
   @override
@@ -39,10 +43,17 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   bool _isInitialized = false;
   List<Video> _videoSources = [];
   Video? _selectedVideo;
+  bool _dataLoaded = false; // 标记数据是否已加载
 
   @override
   void initState() {
     super.initState();
+    // 如果有传入的视频源数据，直接使用
+    if (widget.videoSources != null && widget.videoSources!.isNotEmpty) {
+      _videoSources = widget.videoSources!;
+      _selectedVideo = _videoSources[widget.selectedSourceIndex ?? 0];
+      _dataLoaded = true;
+    }
     _initializeBloc();
   }
 
@@ -51,13 +62,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       // 创建独立的 MovieBloc
       final prefs = await SharedPreferences.getInstance();
       final serverAddress = prefs.getString('api_server_address');
-      
+
       if (serverAddress != null && mounted) {
         final apiClient = ApiClient(baseUrl: serverAddress);
         final repository = MovieRepositoryImpl(
           remoteDataSource: MovieRemoteDataSourceImpl(apiClient),
         );
-        
+
         setState(() {
           _movieBloc = MovieBloc(
             getPopularMovies: GetPopularMovies(repository),
@@ -68,9 +79,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           );
           _isInitialized = true;
         });
-        
-        // 搜索视频源
-        if (widget.title != null) {
+
+        // 只有在数据未加载且没有传入视频源时才搜索视频源
+        if (!_dataLoaded && widget.title != null) {
           _movieBloc?.add(SearchVideosEvent(widget.title!));
         }
       } else if (mounted) {
@@ -124,7 +135,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         ),
       );
     }
-    
+
     return BlocProvider.value(
       value: _movieBloc!,
       child: Scaffold(
@@ -166,25 +177,38 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         ),
         body: BlocBuilder<MovieBloc, MovieState>(
           builder: (context, state) {
+            // 关键修改：即使在加载状态，如果数据已加载，也要显示内容
             if (state is MovieLoading) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.orange,
-                ),
-              );
+              if (_dataLoaded) {
+                return _buildVideoDetail();
+              } else {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.orange,
+                    strokeWidth: 3,
+                  ),
+                );
+              }
             } else if (state is VideosLoaded) {
-              // 只在第一次加载时设置默认选中的视频源
-              if (_videoSources.isEmpty) {
+              // 标记数据已加载
+              if (!_dataLoaded) {
+                _dataLoaded = true;
                 _videoSources = state.videos;
-                _selectedVideo = _videoSources.isNotEmpty ? _videoSources.first : null;
+                _selectedVideo =
+                    _videoSources.isNotEmpty ? _videoSources.first : null;
               }
               return _buildVideoDetail();
             } else if (state is MovieError) {
               return _buildErrorState(state.message);
             } else {
+              // 如果数据已加载，显示内容而不是加载指示器
+              if (_dataLoaded) {
+                return _buildVideoDetail();
+              }
               return const Center(
                 child: CircularProgressIndicator(
                   color: Colors.orange,
+                  strokeWidth: 3,
                 ),
               );
             }
@@ -216,7 +240,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               fit: StackFit.expand,
               children: [
                 // 背景图片
-                if (_selectedVideo?.pic != null && _selectedVideo!.pic!.isNotEmpty)
+                if (_selectedVideo?.pic != null &&
+                    _selectedVideo!.pic!.isNotEmpty)
                   AuthenticatedImage(
                     imageUrl: _selectedVideo!.pic!,
                     fit: BoxFit.cover,
@@ -271,7 +296,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 // 基本信息
                 Row(
                   children: [
-                    if (_selectedVideo?.year != null && _selectedVideo!.year!.isNotEmpty) ...[
+                    if (_selectedVideo?.year != null &&
+                        _selectedVideo!.year!.isNotEmpty) ...[
                       Text(
                         _selectedVideo!.year!,
                         style: TextStyle(
@@ -281,7 +307,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       ),
                       const SizedBox(width: 12),
                     ],
-                    if (_selectedVideo?.type != null && _selectedVideo!.type!.isNotEmpty) ...[
+                    if (_selectedVideo?.type != null &&
+                        _selectedVideo!.type!.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -301,7 +328,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       ),
                       const SizedBox(width: 12),
                     ],
-                    if (_selectedVideo?.note != null && _selectedVideo!.note!.isNotEmpty) ...[
+                    if (_selectedVideo?.note != null &&
+                        _selectedVideo!.note!.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -339,7 +367,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                     },
                     icon: const Icon(Icons.play_arrow),
                     label: Text(
-                      _videoSources.isNotEmpty 
+                      _videoSources.isNotEmpty
                           ? '播放 (${_selectedVideo?.sourceName ?? _selectedVideo?.source ?? "未知来源"})'
                           : '播放',
                       style: const TextStyle(fontSize: 18),
@@ -355,7 +383,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 ),
                 const SizedBox(height: 24),
                 // 剧情简介 - 使用第一个播放源的desc
-                if (_selectedVideo?.description != null && _selectedVideo!.description!.isNotEmpty) ...[
+                if (_selectedVideo?.description != null &&
+                    _selectedVideo!.description!.isNotEmpty) ...[
                   Text(
                     '剧情简介',
                     style: TextStyle(
@@ -468,11 +497,14 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   final source = _videoSources[index];
                   final isSelected = source.id == _selectedVideo?.id;
                   return Card(
-                    color: isSelected ? Colors.orange.withValues(alpha: 0.3) : Colors.grey[800],
+                    color: isSelected
+                        ? Colors.orange.withValues(alpha: 0.3)
+                        : Colors.grey[800],
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: isSelected ? Colors.orange : Colors.grey[600],
+                        backgroundColor:
+                            isSelected ? Colors.orange : Colors.grey[600],
                         child: Text(
                           '${index + 1}',
                           style: const TextStyle(
@@ -486,7 +518,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         style: TextStyle(
                           color: isSelected ? Colors.orange : Colors.white,
                           fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                       subtitle: source.note != null && source.note!.isNotEmpty
@@ -505,7 +538,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                               ),
                             ),
                       trailing: Icon(
-                        isSelected ? Icons.radio_button_checked : Icons.play_arrow,
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.play_arrow,
                         color: Colors.orange,
                       ),
                       onTap: () {
@@ -542,7 +577,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   }
 
   void _playVideo(Video source, int index) {
-    // 导航到新的视频播放器页面
+    // 导航到视频播放页面
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => BlocProvider.value(

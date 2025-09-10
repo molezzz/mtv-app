@@ -222,17 +222,42 @@ class DlnaHandler(private val context: Context) {
                 
                 // 生成友好的设备名称
                 val friendlyName = when {
-                    deviceName != null -> deviceName
-                    server?.contains("QQLiveTV", ignoreCase = true) == true -> "极光TV"
-                    server?.contains("Cling", ignoreCase = true) == true -> "智能电视"
-                    senderAddress == "192.168.1.1" -> "路由器媒体服务"
-                    else -> "DLNA设备 ($senderAddress)"
+                    deviceName != null -> {
+                        Log.d(TAG, "Using device provided name: $deviceName")
+                        deviceName
+                    }
+                    server?.contains("QQLiveTV", ignoreCase = true) == true -> {
+                        Log.d(TAG, "Detected QQLiveTV (极光TV) device")
+                        "极光TV"
+                    }
+                    server?.contains("Cling", ignoreCase = true) == true -> {
+                        Log.d(TAG, "Detected Cling framework device")
+                        "智能电视"
+                    }
+                    server?.contains("iQIYI", ignoreCase = true) == true -> {
+                        Log.d(TAG, "Detected iQIYI (奇异果TV) device")
+                        "奇异果TV"
+                    }
+                    server?.contains("奇异果", ignoreCase = true) == true -> {
+                        Log.d(TAG, "Detected 奇异果TV device by name")
+                        "奇异果TV"
+                    }
+                    senderAddress == "192.168.1.1" -> {
+                        Log.d(TAG, "Detected router media service")
+                        "路由器媒体服务"
+                    }
+                    else -> {
+                        Log.d(TAG, "Using generic device name for $senderAddress")
+                        "DLNA设备 ($senderAddress)"
+                    }
                 }
                 
                 // 解析制造商信息
                 val manufacturer = when {
                     server?.contains("QQLiveTV") == true -> "极光"
                     server?.contains("Cling") == true -> "Android TV"
+                    server?.contains("iQIYI") == true -> "爱奇艺"
+                    server?.contains("奇异果") == true -> "爱奇艺"
                     server?.contains("Linux") == true -> "Linux设备"
                     else -> server ?: "Unknown"
                 }
@@ -354,22 +379,46 @@ class DlnaHandler(private val context: Context) {
         try {
             Log.d(TAG, "=== Starting DLNA Cast ===")
             Log.d(TAG, "Device: ${device["name"]}")
+            Log.d(TAG, "Device Type: ${device["type"]}")
+            Log.d(TAG, "Device Manufacturer: ${device["manufacturer"]}")
+            Log.d(TAG, "Device Address: ${device["address"]}")
             Log.d(TAG, "Video URL: $videoUrl")
             Log.d(TAG, "Title: $title")
+            Log.d(TAG, "Poster: $poster")
+            Log.d(TAG, "Current Time: $currentTime")
+            
+            // 检查是否为奇异果TV设备
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI TV DEVICE DETECTED - Enabling enhanced debugging")
+                Log.d(TAG, "🍇 Device Server: ${device["server"]}")
+                Log.d(TAG, "🍇 Device USN: ${device["usn"]}")
+                Log.d(TAG, "🍇 Device Location: ${device["location"]}")
+            }
             
             val deviceLocation = device["location"] as? String
             if (deviceLocation == null) {
                 Log.e(TAG, "Device location not found")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI CASTING FAILED: No device location URL")
+                }
                 callback(false)
                 return
             }
             
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 Starting IQIYI TV casting process...")
+                    }
+                    
                     // 步骤1: 获取设备描述XML来找到AVTransport服务
-                    val serviceUrl = getAVTransportServiceUrl(deviceLocation)
+                    val serviceUrl = getAVTransportServiceUrl(deviceLocation, isIqiyiDevice)
                     if (serviceUrl == null) {
                         Log.e(TAG, "AVTransport service not found")
+                        if (isIqiyiDevice) {
+                            Log.e(TAG, "🍇 IQIYI CASTING FAILED: AVTransport service not found in device XML")
+                        }
                         withContext(Dispatchers.Main) {
                             callback(false)
                         }
@@ -377,11 +426,17 @@ class DlnaHandler(private val context: Context) {
                     }
                     
                     Log.d(TAG, "Found AVTransport service URL: $serviceUrl")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 IQIYI AVTransport URL: $serviceUrl")
+                    }
                     
                     // 步骤2: 发送SetAVTransportURI命令
-                    val setUriSuccess = setAVTransportURI(serviceUrl, videoUrl, title)
+                    val setUriSuccess = setAVTransportURI(serviceUrl, videoUrl, title, isIqiyiDevice)
                     if (!setUriSuccess) {
                         Log.e(TAG, "Failed to set AV transport URI")
+                        if (isIqiyiDevice) {
+                            Log.e(TAG, "🍇 IQIYI CASTING FAILED: SetAVTransportURI command failed")
+                        }
                         withContext(Dispatchers.Main) {
                             callback(false)
                         }
@@ -389,11 +444,17 @@ class DlnaHandler(private val context: Context) {
                     }
                     
                     Log.d(TAG, "Successfully set AV transport URI")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 IQIYI SetAVTransportURI: SUCCESS")
+                    }
                     
                     // 步骤3: 发送Play命令
-                    val playSuccess = playMedia(serviceUrl)
+                    val playSuccess = playMedia(serviceUrl, isIqiyiDevice)
                     if (!playSuccess) {
                         Log.e(TAG, "Failed to start playback")
+                        if (isIqiyiDevice) {
+                            Log.e(TAG, "🍇 IQIYI CASTING FAILED: Play command failed")
+                        }
                         withContext(Dispatchers.Main) {
                             callback(false)
                         }
@@ -401,6 +462,9 @@ class DlnaHandler(private val context: Context) {
                     }
                     
                     Log.d(TAG, "=== DLNA Cast Started Successfully ===")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 IQIYI TV CASTING SUCCESS! 🎉")
+                    }
                     
                     withContext(Dispatchers.Main) {
                         callback(true)
@@ -409,6 +473,11 @@ class DlnaHandler(private val context: Context) {
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during DLNA casting", e)
                     e.printStackTrace()
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI CASTING EXCEPTION: ${e.message}")
+                        Log.e(TAG, "🍇 Exception cause: ${e.cause}")
+                        Log.e(TAG, "🍇 Stack trace: ${e.stackTraceToString()}")
+                    }
                     withContext(Dispatchers.Main) {
                         callback(false)
                     }
@@ -417,6 +486,10 @@ class DlnaHandler(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error casting video to DLNA device", e)
             e.printStackTrace()
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI OUTER CASTING EXCEPTION: ${e.message}")
+            }
             callback(false)
         }
     }
@@ -432,32 +505,50 @@ class DlnaHandler(private val context: Context) {
             Log.d(TAG, "=== Stopping DLNA Playback ===")
             Log.d(TAG, "Device: ${device["name"]}")
             
+            // 检查是否为奇异果TV设备
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI TV DEVICE DETECTED for stopping")
+            }
+            
             val deviceLocation = device["location"] as? String
             if (deviceLocation == null) {
                 Log.e(TAG, "Device location not found")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI STOP FAILED: No device location URL")
+                }
                 callback(false)
                 return
             }
             
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val serviceUrl = getAVTransportServiceUrl(deviceLocation)
+                    val serviceUrl = getAVTransportServiceUrl(deviceLocation, isIqiyiDevice)
                     if (serviceUrl == null) {
                         Log.e(TAG, "AVTransport service not found for stop command")
+                        if (isIqiyiDevice) {
+                            Log.e(TAG, "🍇 IQIYI STOP FAILED: AVTransport service not found")
+                        }
                         withContext(Dispatchers.Main) {
                             callback(false)
                         }
                         return@launch
                     }
                     
-                    val success = stopMedia(serviceUrl)
+                    val success = stopMedia(serviceUrl, isIqiyiDevice)
                     Log.d(TAG, if (success) "DLNA playback stopped successfully" else "Failed to stop DLNA playback")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, if (success) "🍇 IQIYI playback stopped successfully" else "🍇 Failed to stop IQIYI playback")
+                    }
                     
                     withContext(Dispatchers.Main) {
                         callback(success)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error stopping DLNA playback", e)
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI STOP EXCEPTION: ${e.message}")
+                    }
                     withContext(Dispatchers.Main) {
                         callback(false)
                     }
@@ -465,6 +556,10 @@ class DlnaHandler(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping DLNA playback", e)
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI OUTER STOP EXCEPTION: ${e.message}")
+            }
             callback(false)
         }
     }
@@ -480,32 +575,50 @@ class DlnaHandler(private val context: Context) {
             Log.d(TAG, "=== Pausing DLNA Playback ===")
             Log.d(TAG, "Device: ${device["name"]}")
             
+            // 检查是否为奇异果TV设备
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI TV DEVICE DETECTED for pausing")
+            }
+            
             val deviceLocation = device["location"] as? String
             if (deviceLocation == null) {
                 Log.e(TAG, "Device location not found")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI PAUSE FAILED: No device location URL")
+                }
                 callback(false)
                 return
             }
             
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val serviceUrl = getAVTransportServiceUrl(deviceLocation)
+                    val serviceUrl = getAVTransportServiceUrl(deviceLocation, isIqiyiDevice)
                     if (serviceUrl == null) {
                         Log.e(TAG, "AVTransport service not found for pause command")
+                        if (isIqiyiDevice) {
+                            Log.e(TAG, "🍇 IQIYI PAUSE FAILED: AVTransport service not found")
+                        }
                         withContext(Dispatchers.Main) {
                             callback(false)
                         }
                         return@launch
                     }
                     
-                    val success = pauseMedia(serviceUrl)
+                    val success = pauseMedia(serviceUrl, isIqiyiDevice)
                     Log.d(TAG, if (success) "DLNA playback paused successfully" else "Failed to pause DLNA playback")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, if (success) "🍇 IQIYI playback paused successfully" else "🍇 Failed to pause IQIYI playback")
+                    }
                     
                     withContext(Dispatchers.Main) {
                         callback(success)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error pausing DLNA playback", e)
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI PAUSE EXCEPTION: ${e.message}")
+                    }
                     withContext(Dispatchers.Main) {
                         callback(false)
                     }
@@ -513,6 +626,10 @@ class DlnaHandler(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error pausing DLNA playback", e)
+            val isIqiyiDevice = isIqiyiTVDevice(device)
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI OUTER PAUSE EXCEPTION: ${e.message}")
+            }
             callback(false)
         }
     }
@@ -559,9 +676,12 @@ class DlnaHandler(private val context: Context) {
     
     // === DLNA UPnP 实现方法 ===
     
-    private suspend fun getAVTransportServiceUrl(deviceLocation: String): String? {
+    private suspend fun getAVTransportServiceUrl(deviceLocation: String, isIqiyiDevice: Boolean = false): String? {
         return try {
             Log.d(TAG, "Fetching device description from: $deviceLocation")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Fetching device XML from $deviceLocation")
+            }
             
             val request = Request.Builder()
                 .url(deviceLocation)
@@ -570,87 +690,189 @@ class DlnaHandler(private val context: Context) {
             
             val response = httpClient.newCall(request).execute()
             if (!response.isSuccessful) {
-                Log.e(TAG, "Failed to get device description: ${response.code}")
+                Log.e(TAG, "Failed to get device description: ${response.code} - ${response.message}")
+                Log.e(TAG, "Response headers: ${response.headers}")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI XML FETCH FAILED: HTTP ${response.code} - ${response.message}")
+                    Log.e(TAG, "🍇 IQIYI Response headers: ${response.headers}")
+                }
+                response.body?.string()?.let { body ->
+                    Log.e(TAG, "Response body: $body")
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI Error response body: $body")
+                    }
+                }
                 return null
             }
             
             val xml = response.body?.string() ?: ""
             Log.d(TAG, "Device description XML length: ${xml.length}")
+            Log.d(TAG, "Device description XML content (first 500 chars): ${xml.take(500)}")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI XML SUCCESS: Retrieved ${xml.length} characters")
+                Log.d(TAG, "🍇 IQIYI XML Preview: ${xml.take(500)}")
+                
+                // 为奇异果TV输出完整XML内容供调试
+                if (xml.length <= 3000) {
+                    Log.d(TAG, "🍇 IQIYI COMPLETE XML:\n$xml")
+                } else {
+                    Log.d(TAG, "🍇 IQIYI XML (first 1500 chars):\n${xml.take(1500)}")
+                    Log.d(TAG, "🍇 IQIYI XML (last 1500 chars):\n${xml.takeLast(1500)}")
+                }
+            }
             
             // 解析XML找到AVTransport服务
-            val serviceUrl = parseAVTransportServiceUrl(xml, deviceLocation)
+            val serviceUrl = parseAVTransportServiceUrl(xml, deviceLocation, isIqiyiDevice)
             Log.d(TAG, "Parsed AVTransport service URL: $serviceUrl")
+            
+            if (isIqiyiDevice) {
+                if (serviceUrl != null) {
+                    Log.d(TAG, "🍇 IQIYI XML PARSING SUCCESS: Found AVTransport URL: $serviceUrl")
+                } else {
+                    Log.e(TAG, "🍇 IQIYI XML PARSING FAILED: No AVTransport service found")
+                }
+            }
             
             serviceUrl
         } catch (e: Exception) {
             Log.e(TAG, "Error getting AVTransport service URL", e)
+            e.printStackTrace()
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI XML FETCH EXCEPTION: ${e.message}")
+                Log.e(TAG, "🍇 Exception: ${e.stackTraceToString()}")
+            }
             null
         }
     }
     
-    private fun parseAVTransportServiceUrl(xml: String, baseUrl: String): String? {
+    private fun parseAVTransportServiceUrl(xml: String, baseUrl: String, isIqiyiDevice: Boolean = false): String? {
         try {
-            // 简化的XML解析，找到AVTransport服务
-            val lines = xml.split("\n")
-            var inAVTransportService = false
-            var controlUrl: String? = null
+            Log.d(TAG, "=== Parsing XML for AVTransport Service ===")
+            Log.d(TAG, "Base URL: $baseUrl")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI XML PARSING: Starting to parse for AVTransport service")
+                Log.d(TAG, "🍇 Base URL: $baseUrl")
+            }
             
-            for (line in lines) {
-                val trimmedLine = line.trim()
-                
-                // 检查是否进入AVTransport服务区域
-                if (trimmedLine.contains("urn:schemas-upnp-org:service:AVTransport", ignoreCase = true)) {
-                    inAVTransportService = true
-                    Log.d(TAG, "Found AVTransport service section")
-                    continue
+            // 使用正则表达式解析XML，而不是按行分割
+            // 查找所有service块
+            val servicePattern = Regex("<service>([\\s\\S]*?)</service>", RegexOption.IGNORE_CASE)
+            val serviceMatches = servicePattern.findAll(xml)
+            
+            for (serviceMatch in serviceMatches) {
+                val serviceBlock = serviceMatch.groupValues[1]
+                Log.d(TAG, "Found service block: $serviceBlock")
+                if (isIqiyiDevice) {
+                    Log.d(TAG, "🍇 IQIYI: Found service block")
                 }
                 
-                // 在AVTransport服务区域内查找controlURL
-                if (inAVTransportService && trimmedLine.contains("<controlURL>", ignoreCase = true)) {
-                    val startTag = "<controlURL>"
-                    val endTag = "</controlURL>"
-                    val startIndex = trimmedLine.indexOf(startTag, ignoreCase = true) + startTag.length
-                    val endIndex = trimmedLine.indexOf(endTag, ignoreCase = true)
-                    
-                    if (startIndex > startTag.length - 1 && endIndex > startIndex) {
-                        controlUrl = trimmedLine.substring(startIndex, endIndex).trim()
-                        Log.d(TAG, "Found control URL: $controlUrl")
-                        break
+                // 查找serviceType
+                val serviceTypePattern = Regex("<serviceType[^>]*>(.*?)</serviceType>", RegexOption.IGNORE_CASE)
+                val serviceTypeMatch = serviceTypePattern.find(serviceBlock)
+                val serviceType = serviceTypeMatch?.groupValues?.get(1)?.trim()
+                
+                if (serviceType != null) {
+                    Log.d(TAG, "Found service type: $serviceType")
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 IQIYI Service Type Found: $serviceType")
                     }
-                }
-                
-                // 如果退出AVTransport服务区域
-                if (inAVTransportService && trimmedLine.contains("</service>", ignoreCase = true)) {
-                    break
+                    
+                    // 检查是否为AVTransport服务
+                    if (serviceType.contains("AVTransport", ignoreCase = true) || 
+                        serviceType.contains("urn:schemas-upnp-org:service:AVTransport", ignoreCase = true)) {
+                        Log.d(TAG, "Found AVTransport service section with type: $serviceType")
+                        if (isIqiyiDevice) {
+                            Log.d(TAG, "🍇 IQIYI: Found AVTransport service! Type: $serviceType")
+                        }
+                        
+                        // 查找controlURL
+                        val controlUrlPattern = Regex("<controlURL[^>]*>(.*?)</controlURL>", RegexOption.IGNORE_CASE)
+                        val controlUrlMatch = controlUrlPattern.find(serviceBlock)
+                        val controlUrl = controlUrlMatch?.groupValues?.get(1)?.trim()
+                        
+                        if (controlUrl != null) {
+                            Log.d(TAG, "Found control URL: $controlUrl")
+                            if (isIqiyiDevice) {
+                                Log.d(TAG, "🍇 IQIYI: Found controlURL: $controlUrl")
+                            }
+                            
+                            // 构建完整URL
+                            val finalUrl = if (controlUrl.startsWith("http")) {
+                                Log.d(TAG, "Control URL is absolute: $controlUrl")
+                                if (isIqiyiDevice) {
+                                    Log.d(TAG, "🍇 IQIYI: Control URL is absolute: $controlUrl")
+                                }
+                                controlUrl
+                            } else {
+                                val base = baseUrl.substringBeforeLast("/")
+                                val finalConstructedUrl = if (controlUrl.startsWith("/")) {
+                                    val protocol = baseUrl.substringBefore("://")
+                                    val host = baseUrl.substringAfter("://").substringBefore("/")
+                                    "$protocol://$host$controlUrl"
+                                } else {
+                                    "$base/$controlUrl"
+                                }
+                                Log.d(TAG, "Constructed absolute URL: $finalConstructedUrl")
+                                if (isIqiyiDevice) {
+                                    Log.d(TAG, "🍇 IQIYI: Constructed URL: $finalConstructedUrl")
+                                    Log.d(TAG, "🍇 IQIYI: Base: $base, ControlURL: $controlUrl")
+                                }
+                                finalConstructedUrl
+                            }
+                            
+                            Log.d(TAG, "=== Final AVTransport service URL: $finalUrl ===")
+                            if (isIqiyiDevice) {
+                                Log.d(TAG, "🍇 IQIYI FINAL URL: $finalUrl")
+                            }
+                            return finalUrl
+                        }
+                    }
                 }
             }
             
-            if (controlUrl != null) {
-                // 构建完整URL
-                return if (controlUrl.startsWith("http")) {
-                    controlUrl
-                } else {
-                    val base = baseUrl.substringBeforeLast("/")
-                    if (controlUrl.startsWith("/")) {
-                        val protocol = baseUrl.substringBefore("://")
-                        val host = baseUrl.substringAfter("://").substringBefore("/")
-                        "$protocol://$host$controlUrl"
-                    } else {
-                        "$base/$controlUrl"
-                    }
+            Log.w(TAG, "=== No AVTransport service found in XML ===")
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI PARSING FAILED: No AVTransport service found!")
+            }
+            
+            // 打印所有找到的服务类型供调试
+            Log.w(TAG, "Available services in XML:")
+            val serviceTypePattern = Regex("<serviceType[^>]*>(.*?)</serviceType>", RegexOption.IGNORE_CASE)
+            val serviceTypeMatches = serviceTypePattern.findAll(xml)
+            serviceTypeMatches.forEach { match ->
+                val serviceType = match.groupValues[1].trim()
+                Log.w(TAG, "  Service: $serviceType")
+                if (isIqiyiDevice) {
+                    Log.w(TAG, "🍇 IQIYI Available Service: $serviceType")
                 }
             }
             
             return null
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing AVTransport service URL", e)
+            e.printStackTrace()
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI XML PARSING EXCEPTION: ${e.message}")
+                Log.e(TAG, "🍇 Exception: ${e.stackTraceToString()}")
+            }
             return null
         }
     }
     
-    private suspend fun setAVTransportURI(serviceUrl: String, videoUrl: String, title: String): Boolean {
+    private suspend fun setAVTransportURI(serviceUrl: String, videoUrl: String, title: String, isIqiyiDevice: Boolean = false): Boolean {
         return try {
-            Log.d(TAG, "Setting AV transport URI: $videoUrl")
+            Log.d(TAG, "=== Setting AV Transport URI ===")
+            Log.d(TAG, "Service URL: $serviceUrl")
+            Log.d(TAG, "Video URL: $videoUrl")
+            Log.d(TAG, "Title: $title")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Setting AV Transport URI")
+                Log.d(TAG, "🍇 Service URL: $serviceUrl")
+                Log.d(TAG, "🍇 Video URL: $videoUrl")
+                Log.d(TAG, "🍇 Title: $title")
+            }
             
             val soapAction = "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\""
             val soapBody = """
@@ -666,6 +888,14 @@ class DlnaHandler(private val context: Context) {
                 </s:Envelope>
             """.trimIndent()
             
+            Log.d(TAG, "SOAP Action: $soapAction")
+            Log.d(TAG, "SOAP Body: $soapBody")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI SOAP ACTION: $soapAction")
+                Log.d(TAG, "🍇 IQIYI SOAP BODY:\n$soapBody")
+            }
+            
             val requestBody = RequestBody.create(
                 "text/xml; charset=utf-8".toMediaType(),
                 soapBody
@@ -679,24 +909,88 @@ class DlnaHandler(private val context: Context) {
                 .addHeader("User-Agent", "MTV-App/1.0 UPnP/1.0")
                 .build()
             
+            Log.d(TAG, "Sending SetAVTransportURI request...")
+            Log.d(TAG, "Request headers: ${request.headers}")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Sending SetAVTransportURI request")
+                Log.d(TAG, "🍇 IQIYI Request headers: ${request.headers}")
+            }
+            
             val response = httpClient.newCall(request).execute()
             val success = response.isSuccessful
+            val responseBody = response.body?.string() ?: ""
             
             Log.d(TAG, "SetAVTransportURI response code: ${response.code}")
+            Log.d(TAG, "SetAVTransportURI response message: ${response.message}")
+            Log.d(TAG, "SetAVTransportURI response headers: ${response.headers}")
+            Log.d(TAG, "SetAVTransportURI response body: $responseBody")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI SetAVTransportURI Response:")
+                Log.d(TAG, "🍇 HTTP Code: ${response.code}")
+                Log.d(TAG, "🍇 Message: ${response.message}")
+                Log.d(TAG, "🍇 Headers: ${response.headers}")
+                Log.d(TAG, "🍇 Body: $responseBody")
+            }
+            
             if (!success) {
-                Log.e(TAG, "SetAVTransportURI failed: ${response.body?.string()}")
+                Log.e(TAG, "SetAVTransportURI failed with HTTP ${response.code}: ${response.message}")
+                Log.e(TAG, "Error response body: $responseBody")
+                
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI SetAVTransportURI FAILED!")
+                    Log.e(TAG, "🍇 HTTP ${response.code}: ${response.message}")
+                    Log.e(TAG, "🍇 Response body: $responseBody")
+                }
+                
+                // 分析常见错误
+                when (response.code) {
+                    400 -> Log.e(TAG, "Bad Request - Check SOAP message format")
+                    401 -> Log.e(TAG, "Unauthorized - Device may require authentication")
+                    404 -> Log.e(TAG, "Not Found - Control URL may be incorrect")
+                    405 -> Log.e(TAG, "Method Not Allowed - Device may not support this action")
+                    500 -> Log.e(TAG, "Internal Server Error - Device internal error")
+                    else -> Log.e(TAG, "Unexpected HTTP error code: ${response.code}")
+                }
+                
+                // 检查是否是SOAP Fault
+                if (responseBody.contains("soap:Fault", ignoreCase = true) || 
+                    responseBody.contains("s:Fault", ignoreCase = true)) {
+                    Log.e(TAG, "SOAP Fault detected in response")
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI SOAP FAULT DETECTED!")
+                    }
+                    extractSoapFaultInfo(responseBody)
+                }
+            } else {
+                Log.d(TAG, "SetAVTransportURI completed successfully")
+                if (isIqiyiDevice) {
+                    Log.d(TAG, "🍇 IQIYI SetAVTransportURI SUCCESS!")
+                }
             }
             
             success
         } catch (e: Exception) {
             Log.e(TAG, "Error setting AV transport URI", e)
+            e.printStackTrace()
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI SetAVTransportURI EXCEPTION: ${e.message}")
+                Log.e(TAG, "🍇 Exception: ${e.stackTraceToString()}")
+            }
             false
         }
     }
     
-    private suspend fun playMedia(serviceUrl: String): Boolean {
+    private suspend fun playMedia(serviceUrl: String, isIqiyiDevice: Boolean = false): Boolean {
         return try {
-            Log.d(TAG, "Sending Play command")
+            Log.d(TAG, "=== Sending Play Command ===")
+            Log.d(TAG, "Service URL: $serviceUrl")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Sending Play Command")
+                Log.d(TAG, "🍇 Service URL: $serviceUrl")
+            }
             
             val soapAction = "\"urn:schemas-upnp-org:service:AVTransport:1#Play\""
             val soapBody = """
@@ -711,6 +1005,14 @@ class DlnaHandler(private val context: Context) {
                 </s:Envelope>
             """.trimIndent()
             
+            Log.d(TAG, "Play SOAP Action: $soapAction")
+            Log.d(TAG, "Play SOAP Body: $soapBody")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI Play SOAP ACTION: $soapAction")
+                Log.d(TAG, "🍇 IQIYI Play SOAP BODY:\n$soapBody")
+            }
+            
             val requestBody = RequestBody.create(
                 "text/xml; charset=utf-8".toMediaType(),
                 soapBody
@@ -724,24 +1026,83 @@ class DlnaHandler(private val context: Context) {
                 .addHeader("User-Agent", "MTV-App/1.0 UPnP/1.0")
                 .build()
             
+            Log.d(TAG, "Sending Play request...")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Sending Play request")
+            }
+            
             val response = httpClient.newCall(request).execute()
             val success = response.isSuccessful
+            val responseBody = response.body?.string() ?: ""
             
             Log.d(TAG, "Play command response code: ${response.code}")
+            Log.d(TAG, "Play command response message: ${response.message}")
+            Log.d(TAG, "Play command response headers: ${response.headers}")
+            Log.d(TAG, "Play command response body: $responseBody")
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI Play Command Response:")
+                Log.d(TAG, "🍇 HTTP Code: ${response.code}")
+                Log.d(TAG, "🍇 Message: ${response.message}")
+                Log.d(TAG, "🍇 Headers: ${response.headers}")
+                Log.d(TAG, "🍇 Body: $responseBody")
+            }
+            
             if (!success) {
-                Log.e(TAG, "Play command failed: ${response.body?.string()}")
+                Log.e(TAG, "Play command failed with HTTP ${response.code}: ${response.message}")
+                Log.e(TAG, "Error response body: $responseBody")
+                
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI Play Command FAILED!")
+                    Log.e(TAG, "🍇 HTTP ${response.code}: ${response.message}")
+                    Log.e(TAG, "🍇 Response body: $responseBody")
+                }
+                
+                // 分析常见错误
+                when (response.code) {
+                    400 -> Log.e(TAG, "Bad Request - Check Play command format")
+                    401 -> Log.e(TAG, "Unauthorized - Device may require authentication")
+                    404 -> Log.e(TAG, "Not Found - Control URL may be incorrect")
+                    405 -> Log.e(TAG, "Method Not Allowed - Device may not support Play action")
+                    500 -> Log.e(TAG, "Internal Server Error - Device internal error")
+                    else -> Log.e(TAG, "Unexpected HTTP error code: ${response.code}")
+                }
+                
+                // 检查是否是SOAP Fault
+                if (responseBody.contains("soap:Fault", ignoreCase = true) || 
+                    responseBody.contains("s:Fault", ignoreCase = true)) {
+                    Log.e(TAG, "SOAP Fault detected in Play response")
+                    if (isIqiyiDevice) {
+                        Log.e(TAG, "🍇 IQIYI Play SOAP FAULT DETECTED!")
+                    }
+                    extractSoapFaultInfo(responseBody)
+                }
+            } else {
+                Log.d(TAG, "Play command completed successfully")
+                if (isIqiyiDevice) {
+                    Log.d(TAG, "🍇 IQIYI Play Command SUCCESS!")
+                }
             }
             
             success
         } catch (e: Exception) {
             Log.e(TAG, "Error sending play command", e)
+            e.printStackTrace()
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI Play Command EXCEPTION: ${e.message}")
+                Log.e(TAG, "🍇 Exception: ${e.stackTraceToString()}")
+            }
             false
         }
     }
     
-    private suspend fun stopMedia(serviceUrl: String): Boolean {
+    private suspend fun stopMedia(serviceUrl: String, isIqiyiDevice: Boolean = false): Boolean {
         return try {
             Log.d(TAG, "Sending Stop command")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Sending Stop command")
+            }
             
             val soapAction = "\"urn:schemas-upnp-org:service:AVTransport:1#Stop\""
             val soapBody = """
@@ -772,20 +1133,32 @@ class DlnaHandler(private val context: Context) {
             val success = response.isSuccessful
             
             Log.d(TAG, "Stop command response code: ${response.code}")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI Stop Response Code: ${response.code}")
+            }
             if (!success) {
                 Log.e(TAG, "Stop command failed: ${response.body?.string()}")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI Stop Command FAILED: ${response.body?.string()}")
+                }
             }
             
             success
         } catch (e: Exception) {
             Log.e(TAG, "Error sending stop command", e)
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI Stop Command EXCEPTION: ${e.message}")
+            }
             false
         }
     }
     
-    private suspend fun pauseMedia(serviceUrl: String): Boolean {
+    private suspend fun pauseMedia(serviceUrl: String, isIqiyiDevice: Boolean = false): Boolean {
         return try {
             Log.d(TAG, "Sending Pause command")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI: Sending Pause command")
+            }
             
             val soapAction = "\"urn:schemas-upnp-org:service:AVTransport:1#Pause\""
             val soapBody = """
@@ -816,14 +1189,92 @@ class DlnaHandler(private val context: Context) {
             val success = response.isSuccessful
             
             Log.d(TAG, "Pause command response code: ${response.code}")
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IQIYI Pause Response Code: ${response.code}")
+            }
             if (!success) {
                 Log.e(TAG, "Pause command failed: ${response.body?.string()}")
+                if (isIqiyiDevice) {
+                    Log.e(TAG, "🍇 IQIYI Pause Command FAILED: ${response.body?.string()}")
+                }
             }
             
             success
         } catch (e: Exception) {
             Log.e(TAG, "Error sending pause command", e)
+            if (isIqiyiDevice) {
+                Log.e(TAG, "🍇 IQIYI Pause Command EXCEPTION: ${e.message}")
+            }
             false
+        }
+    }
+    
+    private fun extractSoapFaultInfo(responseBody: String) {
+        try {
+            Log.e(TAG, "=== SOAP Fault Analysis ===")
+            
+            // 提取faultcode
+            val faultCodeRegex = "<(?:soap:|s:)?faultcode[^>]*>([^<]+)</(?:soap:|s:)?faultcode>".toRegex(RegexOption.IGNORE_CASE)
+            val faultCodeMatch = faultCodeRegex.find(responseBody)
+            if (faultCodeMatch != null) {
+                Log.e(TAG, "SOAP Fault Code: ${faultCodeMatch.groupValues[1].trim()}")
+            }
+            
+            // 提取faultstring
+            val faultStringRegex = "<(?:soap:|s:)?faultstring[^>]*>([^<]+)</(?:soap:|s:)?faultstring>".toRegex(RegexOption.IGNORE_CASE)
+            val faultStringMatch = faultStringRegex.find(responseBody)
+            if (faultStringMatch != null) {
+                Log.e(TAG, "SOAP Fault String: ${faultStringMatch.groupValues[1].trim()}")
+            }
+            
+            // 提取detail
+            val detailRegex = """<(?:soap:|s:)?detail[^>]*>([\s\S]*?)</(?:soap:|s:)?detail>""".toRegex(RegexOption.IGNORE_CASE)
+            val detailMatch = detailRegex.find(responseBody)
+            if (detailMatch != null) {
+                Log.e(TAG, "SOAP Fault Detail: ${detailMatch.groupValues[1].trim()}")
+            }
+            
+            // 提取UPnP错误代码
+            val upnpErrorRegex = "<errorCode>([^<]+)</errorCode>".toRegex(RegexOption.IGNORE_CASE)
+            val upnpErrorMatch = upnpErrorRegex.find(responseBody)
+            if (upnpErrorMatch != null) {
+                val errorCode = upnpErrorMatch.groupValues[1].trim()
+                Log.e(TAG, "UPnP Error Code: $errorCode")
+                
+                // 解释常见的UPnP错误代码
+                when (errorCode) {
+                    "701" -> Log.e(TAG, "UPnP Error: Transition not available")
+                    "702" -> Log.e(TAG, "UPnP Error: No contents")
+                    "703" -> Log.e(TAG, "UPnP Error: Read error")
+                    "704" -> Log.e(TAG, "UPnP Error: Format not supported for reading")
+                    "705" -> Log.e(TAG, "UPnP Error: Transport locked")
+                    "706" -> Log.e(TAG, "UPnP Error: Write error")
+                    "707" -> Log.e(TAG, "UPnP Error: Media is write-protected")
+                    "708" -> Log.e(TAG, "UPnP Error: Format not supported for writing")
+                    "709" -> Log.e(TAG, "UPnP Error: Media is full")
+                    "710" -> Log.e(TAG, "UPnP Error: Seek mode not supported")
+                    "711" -> Log.e(TAG, "UPnP Error: Illegal seek target")
+                    "712" -> Log.e(TAG, "UPnP Error: Play mode not supported")
+                    "713" -> Log.e(TAG, "UPnP Error: Record quality not supported")
+                    "714" -> Log.e(TAG, "UPnP Error: Illegal MIME-Type")
+                    "715" -> Log.e(TAG, "UPnP Error: Content 'BUSY'")
+                    "716" -> Log.e(TAG, "UPnP Error: Resource not found")
+                    "717" -> Log.e(TAG, "UPnP Error: Play speed not supported")
+                    "718" -> Log.e(TAG, "UPnP Error: Invalid InstanceID")
+                    else -> Log.e(TAG, "UPnP Error: Unknown error code $errorCode")
+                }
+            }
+            
+            // 提取UPnP错误描述
+            val upnpDescRegex = "<errorDescription>([^<]+)</errorDescription>".toRegex(RegexOption.IGNORE_CASE)
+            val upnpDescMatch = upnpDescRegex.find(responseBody)
+            if (upnpDescMatch != null) {
+                Log.e(TAG, "UPnP Error Description: ${upnpDescMatch.groupValues[1].trim()}")
+            }
+            
+            Log.e(TAG, "=== End SOAP Fault Analysis ===")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error analyzing SOAP fault", e)
         }
     }
 
@@ -841,5 +1292,51 @@ class DlnaHandler(private val context: Context) {
         }
         
         Log.d(TAG, "=== Device List Notification Complete ===")
+    }
+    
+    private fun isIqiyiTVDevice(device: Map<String, Any>): Boolean {
+        try {
+            val name = device["name"] as? String ?: ""
+            val manufacturer = device["manufacturer"] as? String ?: ""
+            val server = device["server"] as? String ?: ""
+            val address = device["address"] as? String ?: ""
+            
+            Log.d(TAG, "Checking if device is IQIYI TV:")
+            Log.d(TAG, "  Name: $name")
+            Log.d(TAG, "  Manufacturer: $manufacturer")
+            Log.d(TAG, "  Server: $server")
+            Log.d(TAG, "  Address: $address")
+            
+            // 检查设备名称
+            val isIqiyiByName = name.contains("奇异果", ignoreCase = true) || 
+                               name.contains("iQIYI", ignoreCase = true) ||
+                               name.contains("IQIYI", ignoreCase = true)
+            
+            // 检查制造商
+            val isIqiyiByManufacturer = manufacturer.contains("奇异果", ignoreCase = true) ||
+                                       manufacturer.contains("爱奇艺", ignoreCase = true) ||
+                                       manufacturer.contains("iQIYI", ignoreCase = true) ||
+                                       manufacturer.contains("IQIYI", ignoreCase = true)
+            
+            // 检查服务器信息
+            val isIqiyiByServer = server.contains("奇异果", ignoreCase = true) ||
+                                 server.contains("爱奇艺", ignoreCase = true) ||
+                                 server.contains("iQIYI", ignoreCase = true) ||
+                                 server.contains("IQIYI", ignoreCase = true)
+            
+            val isIqiyiDevice = isIqiyiByName || isIqiyiByManufacturer || isIqiyiByServer
+            
+            if (isIqiyiDevice) {
+                Log.d(TAG, "🍇 IDENTIFIED AS IQIYI TV DEVICE!")
+                Log.d(TAG, "  By Name: $isIqiyiByName")
+                Log.d(TAG, "  By Manufacturer: $isIqiyiByManufacturer")
+                Log.d(TAG, "  By Server: $isIqiyiByServer")
+            }
+            
+            return isIqiyiDevice
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if device is IQIYI TV", e)
+            return false
+        }
     }
 }

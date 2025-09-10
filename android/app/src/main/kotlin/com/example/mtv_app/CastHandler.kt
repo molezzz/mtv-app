@@ -232,6 +232,37 @@ class CastHandler(private val context: Context) : MethodCallHandler {
                     device["isMock"]?.let { isMock ->
                         Log.d(TAG, "  - Is Mock: $isMock")
                     }
+                    
+                    // 检查是否为奇异果TV设备
+                    val name = device["name"] as? String ?: ""
+                    val manufacturer = device["manufacturer"] as? String ?: ""
+                    val server = device["server"] as? String ?: ""
+                    
+                    val isIqiyiDevice = name.contains("奇异果", ignoreCase = true) || 
+                                      name.contains("iQIYI", ignoreCase = true) ||
+                                      name.contains("IQIYI", ignoreCase = true) ||
+                                      manufacturer.contains("奇异果", ignoreCase = true) ||
+                                      manufacturer.contains("爱奇艺", ignoreCase = true) ||
+                                      manufacturer.contains("iQIYI", ignoreCase = true) ||
+                                      manufacturer.contains("IQIYI", ignoreCase = true) ||
+                                      server.contains("奇异果", ignoreCase = true) ||
+                                      server.contains("爱奇艺", ignoreCase = true) ||
+                                      server.contains("iQIYI", ignoreCase = true) ||
+                                      server.contains("IQIYI", ignoreCase = true)
+                    
+                    if (isIqiyiDevice) {
+                        Log.d(TAG, "🍇 IDENTIFIED DLNA DEVICE AS IQIYI TV!")
+                        Log.d(TAG, "  Device details for debugging:")
+                        Log.d(TAG, "  - Name: $name")
+                        Log.d(TAG, "  - Manufacturer: $manufacturer")
+                        Log.d(TAG, "  - Server: $server")
+                        device["usn"]?.let { usn ->
+                            Log.d(TAG, "  - USN: $usn")
+                        }
+                        device["location"]?.let { location ->
+                            Log.d(TAG, "  - Location: $location")
+                        }
+                    }
                 }
                 
                 devices.addAll(dlnaDevices)

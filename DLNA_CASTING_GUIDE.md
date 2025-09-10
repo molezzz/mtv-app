@@ -1,159 +1,240 @@
 # DLNA投屏功能测试指南
 
-## 新增功能说明
+## 测试目标
+验证DLNA投屏功能在不同设备上的兼容性和稳定性，特别是解决奇异果TV投屏失败的问题。
 
-我们已经实现了真正的DLNA投屏功能，不再是模拟操作。新实现包括：
+## 测试环境准备
 
-### 真实DLNA投屏流程
+### 1. 硬件要求
+- Android手机（Android 6.0及以上）
+- 支持DLNA的智能电视或机顶盒
+- 稳定的WiFi网络环境
 
-1. **设备发现** - 通过SSDP协议发现UPnP设备
-2. **设备连接** - 获取设备描述XML，解析AVTransport服务
-3. **媒体投屏** - 发送真实的UPnP SOAP命令
-4. **播放控制** - 支持播放、暂停、停止操作
+### 2. 软件要求
+- MTV应用最新版本
+- 云视听极光TV
+- 奇异果TV
+- 其他DLNA兼容设备（可选）
 
-### 实现的UPnP命令
-
-1. **SetAVTransportURI** - 设置要播放的媒体URL
-2. **Play** - 开始播放媒体
-3. **Pause** - 暂停播放
-4. **Stop** - 停止播放
-
-## 技术实现详情
-
-### HTTP客户端配置
-```kotlin
-private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-    .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-    .build()
-```
-
-### SOAP消息示例
-
-#### SetAVTransportURI命令
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-    <s:Body>
-        <u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-            <InstanceID>0</InstanceID>
-            <CurrentURI>[视频URL]</CurrentURI>
-            <CurrentURIMetaData>[媒体元数据]</CurrentURIMetaData>
-        </u:SetAVTransportURI>
-    </s:Body>
-</s:Envelope>
-```
-
-#### Play命令
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-    <s:Body>
-        <u:Play xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-            <InstanceID>0</InstanceID>
-            <Speed>1</Speed>
-        </u:Play>
-    </s:Body>
-</s:Envelope>
-```
+### 3. 网络配置
+- 所有设备连接到同一WiFi网络
+- 路由器启用UPnP功能
+- 确保网络无防火墙限制
 
 ## 测试步骤
 
-### 1. 检查调试日志
+### 1. 设备发现测试
+1. 打开MTV应用
+2. 进入投屏功能页面
+3. 点击"搜索设备"
+4. 观察设备列表更新情况
+5. 记录发现的设备名称和类型
 
-启动应用后，查看logcat中的DLNA相关日志：
+### 2. 云视听极光投屏测试
+1. 选择云视听极光设备
+2. 点击"连接设备"
+3. 选择任意视频进行投屏
+4. 观察投屏是否成功
+5. 记录操作过程和结果
 
-```bash
-adb logcat -s DlnaHandler:* CastHandler:*
+### 3. 奇异果TV投屏测试
+1. 选择奇异果TV设备
+2. 点击"连接设备"
+3. 选择任意视频进行投屏
+4. 观察投屏是否成功
+5. 记录操作过程和结果
+
+### 4. 功能控制测试
+1. 播放/暂停控制
+2. 音量调节
+3. 进度跳转
+4. 停止投屏
+
+## 调试信息收集
+
+### 1. 日志收集方法
+```
+# 使用Android Studio Logcat过滤相关日志
+tag:DlnaHandler OR tag:CastHandler
+
+# 或使用命令行
+adb logcat -s DlnaHandler CastHandler
 ```
 
-### 2. 触发投屏功能
-
-1. 在应用中进入视频播放页面
-2. 点击投屏按钮
-3. 选择一个DLNA设备（如极光TV）
-4. 观察调试日志中的投屏过程
-
-### 3. 预期的日志输出
-
-**成功的投屏流程应该显示：**
-
+### 2. 关键日志信息
 ```
-DlnaHandler: === Starting DLNA Cast ===
-DlnaHandler: Device: 客厅极光TV(dlna)
-DlnaHandler: Video URL: [实际视频URL]
-DlnaHandler: Fetching device description from: http://192.168.1.234:39520/description.xml
-DlnaHandler: Found AVTransport service section
-DlnaHandler: Found control URL: /MediaRenderer/AVTransport/Control
-DlnaHandler: Found AVTransport service URL: http://192.168.1.234:39520/MediaRenderer/AVTransport/Control
-DlnaHandler: Setting AV transport URI: [视频URL]
-DlnaHandler: SetAVTransportURI response code: 200
-DlnaHandler: Successfully set AV transport URI
-DlnaHandler: Sending Play command
-DlnaHandler: Play command response code: 200
-DlnaHandler: === DLNA Cast Started Successfully ===
+# 需要收集的关键信息:
+
+1. 设备发现阶段:
+   - SSDP响应内容
+   - 设备识别信息
+   - 奇异果TV特殊标记日志(🍇)
+
+2. 连接阶段:
+   - 设备连接状态
+   - XML描述文件获取
+   - AVTransport服务解析
+
+3. 投屏阶段:
+   - SetAVTransportURI命令
+   - Play命令执行
+   - HTTP响应状态
+
+4. 错误信息:
+   - SOAP Fault详情
+   - UPnP错误代码
+   - 异常堆栈信息
 ```
 
-**失败时可能的错误：**
+### 3. 屏幕截图
+- 设备列表页面
+- 投屏控制页面
+- 错误提示页面
 
+## 预期结果
+
+### 1. 成功场景
+- 设备能够被正确发现和识别
+- 云视听极光投屏成功
+- 奇异果TV投屏成功
+- 播放控制功能正常
+- 投屏结束无异常
+
+### 2. 失败场景记录
 ```
-DlnaHandler: Failed to get device description: 404
-DlnaHandler: AVTransport service not found
-DlnaHandler: SetAVTransportURI failed: [错误详情]
-DlnaHandler: Play command failed: [错误详情]
+# 如果投屏失败，请记录以下信息:
+
+1. 设备信息:
+   - 设备名称: _____
+   - 设备类型: _____
+   - 制造商: _____
+   - IP地址: _____
+
+2. 错误信息:
+   - 应用提示: _____
+   - 日志错误: _____
+   - HTTP状态码: _____
+
+3. 操作步骤:
+   - 步骤1: _____
+   - 步骤2: _____
+   - 步骤3: _____
 ```
 
-## 可能的问题和解决方案
+## 问题分析流程
 
-### 1. HTTP 403/404错误
-- **原因**: 设备描述URL不正确或设备不支持外部访问
-- **解决**: 检查设备是否支持DLNA投屏，确认网络连接
+### 1. 设备发现问题
+```
+检查点:
+□ 网络连接是否正常
+□ 路由器UPnP是否开启
+□ 防火墙是否阻止多播流量
+□ 设备是否处于待机状态
+```
 
-### 2. AVTransport服务未找到
-- **原因**: 设备不是MediaRenderer或XML解析失败
-- **解决**: 检查设备类型，可能是MediaServer而非MediaRenderer
+### 2. 连接问题
+```
+检查点:
+□ 设备是否支持DLNA/UPnP
+□ 设备XML描述是否可访问
+□ AVTransport服务是否存在
+□ 控制URL是否正确构造
+```
 
-### 3. SOAP命令失败
-- **原因**: 视频格式不支持或网络问题
-- **解决**: 
-  - 检查视频URL是否可访问
-  - 确认视频格式（MP4, M3U8等）是否被设备支持
-  - 检查网络连接稳定性
+### 3. 投屏问题
+```
+检查点:
+□ 视频URL是否可访问
+□ 视频格式是否支持
+□ SOAP命令格式是否正确
+□ 设备是否返回错误信息
+```
 
-### 4. 设备连接超时
-- **原因**: 设备响应慢或网络延迟高
-- **解决**: 增加超时时间或检查网络质量
+### 4. 奇异果TV特定问题
+```
+检查点:
+□ 是否识别为奇异果TV设备
+□ XML解析是否成功
+□ SOAP命令是否被接受
+□ 是否有特殊错误代码
+```
 
-## 设备兼容性
+## 常见问题解决方案
 
-### 已测试的设备类型
-1. **极光TV** - 支持QQLiveTV DLNA服务
-2. **Android TV盒子** - 支持Cling UPnP框架
-3. **路由器UPnP服务** - 基础MediaServer功能
+### 1. 设备无法发现
+- 重启路由器和设备
+- 检查WiFi连接状态
+- 确认设备处于活跃状态
+- 尝试手动输入设备IP
 
-### 支持的视频格式
-- MP4 (H.264/H.265)
-- M3U8 (HLS流)
-- 其他UPnP兼容格式
+### 2. 连接失败
+- 检查设备是否支持DLNA
+- 验证XML描述文件URL
+- 确认网络访问权限
+- 尝试其他DLNA应用测试
 
-## 故障排除指南
+### 3. 投屏失败
+- 更换视频源测试
+- 检查视频格式兼容性
+- 查看设备支持的媒体格式
+- 收集完整错误日志
 
-### 检查清单
-- [ ] 设备在同一WiFi网络
-- [ ] 设备支持DLNA/UPnP MediaRenderer
-- [ ] 视频URL可直接访问
-- [ ] 应用有网络权限
-- [ ] 防火墙允许UPnP流量
+### 4. 控制失效
+- 检查设备是否支持控制命令
+- 验证SOAP命令格式
+- 确认设备状态同步
+- 重启投屏会话
 
-### 高级调试
-1. 使用UPnP测试工具验证设备兼容性
-2. 抓取网络包分析SOAP通信
-3. 检查设备制造商的DLNA实现细节
+## 测试报告模板
 
-## 下一步改进
+### 基本信息
+- 测试日期: _____
+- 应用版本: _____
+- Android版本: _____
+- 设备型号: _____
 
-1. **设备能力检测** - 自动检测设备支持的媒体格式
-2. **播放状态监控** - 实时获取播放进度和状态
-3. **错误恢复机制** - 网络中断后自动重连
-4. **媒体转码支持** - 不兼容格式的自动转换
+### 测试结果
+| 设备名称 | 发现 | 连接 | 投屏 | 控制 | 备注 |
+|---------|------|------|------|------|------|
+| 云视听极光 | □是 □否 | □是 □否 | □是 □否 | □是 □否 | _____ |
+| 奇异果TV | □是 □否 | □是 □否 | □是 □否 | □是 □否 | _____ |
+| 其他设备 | □是 □否 | □是 □否 | □是 □否 | □是 □否 | _____ |
+
+### 问题记录
+```
+1. 问题描述: _____
+   发现时间: _____
+   影响范围: _____
+   解决方案: _____
+
+2. 问题描述: _____
+   发现时间: _____
+   影响范围: _____
+   解决方案: _____
+```
+
+### 改进建议
+- 功能优化: _____
+- 用户体验: _____
+- 性能提升: _____
+- 兼容性改进: _____
+
+## 附录
+
+### 1. DLNA相关术语
+- **UPnP**: 通用即插即用
+- **SSDP**: 简单服务发现协议
+- **AVTransport**: 音视频传输服务
+- **SOAP**: 简单对象访问协议
+
+### 2. 常见错误代码
+- 400: 请求格式错误
+- 401: 未授权访问
+- 404: 资源未找到
+- 500: 服务器内部错误
+- 701-718: UPnP特定错误代码
+
+### 3. 技术参考
+- DLNA官方规范
+- UPnP设备架构文档
+- 奇异果TV开发者文档
