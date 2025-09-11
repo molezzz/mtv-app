@@ -28,25 +28,20 @@ class CategorySelector extends StatelessWidget {
 
   // 预定义的剧集分类
   static const List<Map<String, String>> tvCategories = [
-    {'name': '热门', 'tag': 'hot_gaia', 'type': 'tv'},
-    {'name': '最新', 'tag': 'now_playing', 'type': 'tv'},
-    {'name': '高分', 'tag': 'top_gaia', 'type': 'tv'},
-    {'name': '国产剧', 'tag': 'domestic', 'type': 'tv'},
-    {'name': '美剧', 'tag': 'american', 'type': 'tv'},
-    {'name': '韩剧', 'tag': 'korean', 'type': 'tv'},
-    {'name': '日剧', 'tag': 'japanese', 'type': 'tv'},
-    {'name': '英剧', 'tag': 'british', 'type': 'tv'},
+    {'name': '全部', 'tag': 'all', 'type': 'tv'},
+    {'name': '国产剧', 'tag': 'domestic', 'type': 'tv_domestic'},
+    {'name': '美剧', 'tag': 'american', 'type': 'tv_american'},
+    {'name': '韩剧', 'tag': 'korean', 'type': 'tv_korean'},
+    {'name': '日剧', 'tag': 'japanese', 'type': 'tv_japanese'},
+    {'name': '动漫', 'tag': 'animation', 'type': 'tv_animation'},
+    {'name': '纪录片', 'tag': 'documentary', 'type': 'tv_documentary'},
   ];
 
   // 预定义的综艺分类
   static const List<Map<String, String>> showCategories = [
-    {'name': '热门', 'tag': 'hot_gaia', 'type': 'show'},
-    {'name': '最新', 'tag': 'now_playing', 'type': 'show'},
-    {'name': '高分', 'tag': 'top_gaia', 'type': 'show'},
-    {'name': '大陆综艺', 'tag': 'domestic', 'type': 'show'},
-    {'name': '港台综艺', 'tag': 'hktw', 'type': 'show'},
-    {'name': '日韩综艺', 'tag': 'korean', 'type': 'show'},
-    {'name': '欧美综艺', 'tag': 'western', 'type': 'show'},
+    {'name': '全部', 'tag': 'all', 'type': 'show'},
+    {'name': '国内', 'tag': 'domestic', 'type': 'show_domestic'},
+    {'name': '国外', 'tag': 'foreign', 'type': 'show_foreign'},
   ];
 
   @override
@@ -60,7 +55,7 @@ class CategorySelector extends StatelessWidget {
     } else {
       categories = movieCategories;
     }
-    
+
     return SizedBox(
       height: 50,
       child: ListView.builder(
@@ -70,7 +65,7 @@ class CategorySelector extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           final isSelected = selectedCategory == category['tag'];
-          
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
@@ -78,14 +73,16 @@ class CategorySelector extends StatelessWidget {
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
+                  // 传递tag和type参数，其中type应该包含完整前缀
                   onCategorySelected(category['tag']!, category['type']!);
                 }
               },
-              selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+              selectedColor:
+                  Theme.of(context).primaryColor.withValues(alpha: 0.2),
               checkmarkColor: Theme.of(context).primaryColor,
               labelStyle: TextStyle(
-                color: isSelected 
-                    ? Theme.of(context).primaryColor 
+                color: isSelected
+                    ? Theme.of(context).primaryColor
                     : Theme.of(context).textTheme.bodyMedium?.color,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),

@@ -71,7 +71,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       ));
     } catch (e) {
       print('Error fetching douban movies: $e');
-      emit(MovieError(message: 'Failed to fetch douban movies: ${e.toString()}'));
+      emit(MovieError(
+          message: 'Failed to fetch douban movies: ${e.toString()}'));
     }
   }
 
@@ -98,7 +99,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
           );
         }
       } catch (e) {
-        emit(MovieError(message: 'Failed to fetch more douban movies: ${e.toString()}'));
+        emit(MovieError(
+            message: 'Failed to fetch more douban movies: ${e.toString()}'));
       }
     }
   }
@@ -109,7 +111,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
   ) async {
     emit(MovieLoading());
     try {
-      print('Fetching douban categories: kind=${event.kind}, category=${event.category}, type=${event.type}');
+      print(
+          'Fetching douban categories: kind=${event.kind}, category=${event.category}, type=${event.type}');
       final movies = await getDoubanCategories(
         kind: event.kind,
         category: event.category,
@@ -126,7 +129,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       ));
     } catch (e) {
       print('Error fetching douban categories: $e');
-      emit(MovieError(message: 'Failed to fetch douban categories: ${e.toString()}'));
+      emit(MovieError(
+          message: 'Failed to fetch douban categories: ${e.toString()}'));
     }
   }
 
@@ -154,7 +158,9 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
           );
         }
       } catch (e) {
-        emit(MovieError(message: 'Failed to fetch more douban categories: ${e.toString()}'));
+        emit(MovieError(
+            message:
+                'Failed to fetch more douban categories: ${e.toString()}'));
       }
     }
   }
@@ -183,7 +189,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       final sources = await getVideoSources();
       emit(VideoSourcesLoaded(sources: sources));
     } catch (e) {
-      emit(MovieError(message: 'Failed to fetch video sources: ${e.toString()}'));
+      emit(MovieError(
+          message: 'Failed to fetch video sources: ${e.toString()}'));
     }
   }
 
@@ -204,7 +211,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         hasReachedMax: movies.isEmpty,
       ));
     } catch (e) {
-      emit(MovieError(message: 'Failed to fetch category movies: ${e.toString()}'));
+      emit(MovieError(
+          message: 'Failed to fetch category movies: ${e.toString()}'));
     }
   }
 
@@ -217,7 +225,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       final videoDetail = await getVideoDetail(event.source, event.id);
       emit(VideoDetailLoaded(videoDetail: videoDetail));
     } catch (e) {
-      emit(MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
+      emit(
+          MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
     }
   }
 
@@ -230,8 +239,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       final videoDetail = await getVideoDetail(event.source, event.id);
       emit(VideoDetailLoaded(videoDetail: videoDetail));
     } catch (e) {
-      emit(MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
+      emit(
+          MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
     }
   }
 }
-

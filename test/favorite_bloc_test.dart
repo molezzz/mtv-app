@@ -48,7 +48,8 @@ void main() {
     });
 
     group('LoadFavorites', () {
-      test('emits [FavoriteLoading, FavoritesLoaded] when successful', () async {
+      test('emits [FavoriteLoading, FavoritesLoaded] when successful',
+          () async {
         final favorites = [
           Favorite(
             cover: 'cover1',
@@ -156,7 +157,8 @@ void main() {
         // Set initial state
         bloc.emit(FavoritesLoaded(existingFavorites));
 
-        when(mockAddFavorite('key2', newFavorite)).thenAnswer((_) async => true);
+        when(mockAddFavorite('key2', newFavorite))
+            .thenAnswer((_) async => true);
 
         final expected = [
           FavoritesLoaded([

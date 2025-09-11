@@ -17,11 +17,14 @@ import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
-import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart' as favorite_event;
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart'
+    as favorite_event;
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_state.dart';
 import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorites.dart';
-import 'package:mtv_app/src/features/favorites/domain/usecases/delete_favorite.dart' as delete_usecase;
-import 'package:mtv_app/src/features/favorites/domain/usecases/add_favorite.dart' as add_usecase;
+import 'package:mtv_app/src/features/favorites/domain/usecases/delete_favorite.dart'
+    as delete_usecase;
+import 'package:mtv_app/src/features/favorites/domain/usecases/add_favorite.dart'
+    as add_usecase;
 import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorite_status.dart';
 import 'package:mtv_app/src/features/favorites/data/repositories/favorite_repository_impl.dart';
 import 'package:mtv_app/src/features/favorites/data/datasources/favorite_remote_data_source.dart';
@@ -88,9 +91,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         );
 
         // 创建详情页专用的FavoriteBloc实例
-        final favoriteRemoteDataSource = FavoriteRemoteDataSourceImpl(apiClient);
-        final favoriteRepository = FavoriteRepositoryImpl(
-            remoteDataSource: favoriteRemoteDataSource);
+        final favoriteRemoteDataSource =
+            FavoriteRemoteDataSourceImpl(apiClient);
+        final favoriteRepository =
+            FavoriteRepositoryImpl(remoteDataSource: favoriteRemoteDataSource);
         final favoriteBloc = FavoriteBloc(
           getFavorites: GetFavorites(favoriteRepository),
           deleteFavorite: delete_usecase.DeleteFavorite(favoriteRepository),
@@ -241,9 +245,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   if (_selectedVideo != null) {
                     final key =
                         '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
-                    context.read<FavoriteBloc>().add(favorite_event.CheckFavoriteStatus(key));
+                    context
+                        .read<FavoriteBloc>()
+                        .add(favorite_event.CheckFavoriteStatus(key));
                   }
-
                 }
                 return _buildVideoDetail();
               } else if (state is MovieError) {
@@ -295,7 +300,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       widget.onFavoriteStatusChanged?.call(key, false);
     } else {
       // 添加收藏
-      context.read<FavoriteBloc>().add(favorite_event.AddFavorite(key, favorite));
+      context
+          .read<FavoriteBloc>()
+          .add(favorite_event.AddFavorite(key, favorite));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已添加到收藏')),
       );

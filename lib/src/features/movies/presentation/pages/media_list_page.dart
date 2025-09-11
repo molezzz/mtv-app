@@ -59,7 +59,8 @@ class _MediaListPageState extends State<MediaListPage> {
             FetchDoubanCategories(
               kind: 'tv',
               category: 'tv',
-              type: 'tv',
+              type:
+                  _selectedCategory.isEmpty ? 'tv_hot_gaia' : _selectedCategory,
               limit: 25,
               start: 0,
             ),
@@ -69,7 +70,9 @@ class _MediaListPageState extends State<MediaListPage> {
             FetchDoubanCategories(
               kind: 'tv',
               category: 'show',
-              type: 'show',
+              type: _selectedCategory.isEmpty
+                  ? 'show_hot_gaia'
+                  : _selectedCategory,
               limit: 25,
               start: 0,
             ),
@@ -96,7 +99,7 @@ class _MediaListPageState extends State<MediaListPage> {
             FetchDoubanCategories(
               kind: 'tv',
               category: 'tv',
-              type: category, // 这里使用category作为type参数
+              type: type, // 使用传入的type参数，它已经包含了正确的前缀
               limit: 25,
               start: 0,
             ),
@@ -106,7 +109,7 @@ class _MediaListPageState extends State<MediaListPage> {
             FetchDoubanCategories(
               kind: 'tv',
               category: 'show',
-              type: category, // 这里使用category作为type参数
+              type: type, // 使用传入的type参数，它已经包含了正确的前缀
               limit: 25,
               start: 0,
             ),
@@ -401,14 +404,17 @@ class _MediaListPageState extends State<MediaListPage> {
         context.read<MovieBloc>().add(FetchMoreDoubanCategories(
               kind: 'tv',
               category: 'tv',
-              type: _selectedCategory,
+              type:
+                  _selectedCategory.isEmpty ? 'tv_hot_gaia' : _selectedCategory,
               start: state.movies.length,
             ));
       } else if (widget.mediaType == 'show') {
         context.read<MovieBloc>().add(FetchMoreDoubanCategories(
               kind: 'tv',
               category: 'show',
-              type: _selectedCategory,
+              type: _selectedCategory.isEmpty
+                  ? 'show_hot_gaia'
+                  : _selectedCategory,
               start: state.movies.length,
             ));
       } else {

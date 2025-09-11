@@ -103,8 +103,8 @@ class FavoriteBloc extends Bloc<favorite_event.FavoriteEvent, FavoriteState> {
             saveTime: event.favorite.saveTime,
           );
           // Check if the item already exists to avoid duplicates
-          final exists = currentFavorites
-              .any((favorite) => favorite.key == event.key);
+          final exists =
+              currentFavorites.any((favorite) => favorite.key == event.key);
           if (!exists) {
             final updatedFavorites = List<FavoriteItem>.from(currentFavorites)
               ..add(newFavoriteItem);
