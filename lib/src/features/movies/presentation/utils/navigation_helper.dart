@@ -21,6 +21,7 @@ class NavigationHelper {
     String? source,
     String? id,
     Video? video, // 如果已有Video对象，直接使用
+    Function(String key, bool isFavorite)? onFavoriteStatusChanged, // 添加收藏状态变化回调
   }) async {
     // 防止重复导航
     if (_isNavigating) return;
@@ -36,6 +37,7 @@ class NavigationHelper {
               id: video.id,
               title: title,
               poster: imageUrl,
+              onFavoriteStatusChanged: onFavoriteStatusChanged,
             ),
           ),
         );
@@ -51,6 +53,7 @@ class NavigationHelper {
               id: id,
               title: title,
               poster: imageUrl,
+              onFavoriteStatusChanged: onFavoriteStatusChanged,
             ),
           ),
         );
@@ -62,6 +65,7 @@ class NavigationHelper {
         context: context,
         title: title,
         imageUrl: imageUrl,
+        onFavoriteStatusChanged: onFavoriteStatusChanged,
       );
     } finally {
       _isNavigating = false;
@@ -73,6 +77,7 @@ class NavigationHelper {
     required BuildContext context,
     required String title,
     String? imageUrl,
+    Function(String key, bool isFavorite)? onFavoriteStatusChanged, // 添加收藏状态变化回调
   }) async {
     // 显示加载对话框
     showDialog(
@@ -130,6 +135,7 @@ class NavigationHelper {
                 id: video.id,
                 title: title,
                 poster: imageUrl,
+                onFavoriteStatusChanged: onFavoriteStatusChanged,
               ),
             ),
           );

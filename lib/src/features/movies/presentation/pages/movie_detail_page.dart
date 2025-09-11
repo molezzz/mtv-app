@@ -17,10 +17,18 @@ import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
-import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart'
-    as favorite_event;
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart' as favorite_event;
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_state.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorites.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/delete_favorite.dart' as delete_usecase;
+import 'package:mtv_app/src/features/favorites/domain/usecases/add_favorite.dart' as add_usecase;
+import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorite_status.dart';
+import 'package:mtv_app/src/features/favorites/data/repositories/favorite_repository_impl.dart';
+import 'package:mtv_app/src/features/favorites/data/datasources/favorite_remote_data_source.dart';
 import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
+
+// 定义一个回调函数类型，用于通知收藏状态变化
+typedef FavoriteStatusCallback = void Function(String key, bool isFavorite);
 
 class MovieDetailPage extends StatefulWidget {
   final String? source;
@@ -29,6 +37,7 @@ class MovieDetailPage extends StatefulWidget {
   final String? poster;
   final List<Video>? videoSources; // 添加视频源参数
   final int? selectedSourceIndex; // 添加选中的源索引参数
+  final FavoriteStatusCallback? onFavoriteStatusChanged; // 添加收藏状态变化回调
 
   const MovieDetailPage({
     super.key,
@@ -38,6 +47,7 @@ class MovieDetailPage extends StatefulWidget {
     this.poster,
     this.videoSources,
     this.selectedSourceIndex,
+    this.onFavoriteStatusChanged,
   });
 
   @override
@@ -46,7 +56,7 @@ class MovieDetailPage extends StatefulWidget {
 
 class _MovieDetailPageState extends State<MovieDetailPage> {
   MovieBloc? _movieBloc;
-  FavoriteBloc? _favoriteBloc;
+  FavoriteBloc? _favoriteBloc; // 详情页专用的FavoriteBloc实例
   bool _isInitialized = false;
   List<Video> _videoSources = [];
   Video? _selectedVideo;
@@ -77,6 +87,17 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           remoteDataSource: MovieRemoteDataSourceImpl(apiClient),
         );
 
+        // 创建详情页专用的FavoriteBloc实例
+        final favoriteRemoteDataSource = FavoriteRemoteDataSourceImpl(apiClient);
+        final favoriteRepository = FavoriteRepositoryImpl(
+            remoteDataSource: favoriteRemoteDataSource);
+        final favoriteBloc = FavoriteBloc(
+          getFavorites: GetFavorites(favoriteRepository),
+          deleteFavorite: delete_usecase.DeleteFavorite(favoriteRepository),
+          addFavorite: add_usecase.AddFavorite(favoriteRepository),
+          getFavoriteStatus: GetFavoriteStatus(favoriteRepository),
+        );
+
         setState(() {
           _movieBloc = MovieBloc(
             getPopularMovies: GetPopularMovies(repository),
@@ -86,8 +107,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             getVideoSources: GetVideoSources(repository),
             getVideoDetail: GetVideoDetail(repository),
           );
-          // 获取 FavoriteBloc
-          _favoriteBloc = context.read<FavoriteBloc>();
+          // 使用详情页专用的FavoriteBloc实例
+          _favoriteBloc = favoriteBloc;
           _isInitialized = true;
         });
 
@@ -126,12 +147,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   @override
   void dispose() {
     _movieBloc?.close();
+    _favoriteBloc?.close(); // 关闭详情页专用的FavoriteBloc实例
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized || _movieBloc == null) {
+    if (!_isInitialized || _movieBloc == null || _favoriteBloc == null) {
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -154,8 +176,11 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       );
     }
 
-    return BlocProvider.value(
-      value: _movieBloc!,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: _movieBloc!),
+        BlocProvider.value(value: _favoriteBloc!),
+      ],
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -184,13 +209,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               setState(() {
                 _isFavorite = state.isFavorite;
               });
-            } else if (state is FavoritesLoaded) {
-              // 在添加或删除收藏后重新检查当前视频的收藏状态
-              if (_selectedVideo != null) {
-                final key =
-                    '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
-                _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
-              }
             } else if (state is FavoriteError) {
               // 显示错误信息但不改变当前的收藏状态
               ScaffoldMessenger.of(context).showSnackBar(
@@ -223,8 +241,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   if (_selectedVideo != null) {
                     final key =
                         '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
-                    _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
+                    context.read<FavoriteBloc>().add(favorite_event.CheckFavoriteStatus(key));
                   }
+
                 }
                 return _buildVideoDetail();
               } else if (state is MovieError) {
@@ -268,16 +287,20 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
     if (_isFavorite) {
       // 取消收藏
-      _favoriteBloc?.add(favorite_event.DeleteFavorite(key));
+      context.read<FavoriteBloc>().add(favorite_event.DeleteFavorite(key));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已取消收藏')),
       );
+      // 通知收藏状态变化
+      widget.onFavoriteStatusChanged?.call(key, false);
     } else {
       // 添加收藏
-      _favoriteBloc?.add(favorite_event.AddFavorite(key, favorite));
+      context.read<FavoriteBloc>().add(favorite_event.AddFavorite(key, favorite));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已添加到收藏')),
       );
+      // 通知收藏状态变化
+      widget.onFavoriteStatusChanged?.call(key, true);
     }
   }
 

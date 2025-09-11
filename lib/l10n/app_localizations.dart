@@ -23,10 +23,10 @@ class AppLocalizations {
   String get appTitle {
     switch (localeName) {
       case 'zh':
-        return 'MTV 应用';
+        return '清晨TV';
       case 'en':
       default:
-        return 'MTV App';
+        return 'DawnTV';
     }
   }
 

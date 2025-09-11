@@ -124,7 +124,7 @@ class _AppState extends State<App> {
       child: Consumer<LocaleNotifier>(
         builder: (context, localeNotifier, child) {
           return MaterialApp(
-            title: 'MTV App',
+            title: 'DawnTV',
             theme: darkTheme,
             debugShowCheckedModeBanner: false,
             localizationsDelegates: const [
@@ -149,7 +149,8 @@ class _AppState extends State<App> {
                   BlocProvider(
                     create: (context) {
                       final repository = MovieRepositoryImpl(
-                        remoteDataSource: MovieRemoteDataSourceImpl(_apiClient!),
+                        remoteDataSource:
+                            MovieRemoteDataSourceImpl(_apiClient!),
                       );
                       return MovieBloc(
                         getPopularMovies: GetPopularMovies(repository),
@@ -171,7 +172,8 @@ class _AppState extends State<App> {
                         getFavorites: GetFavorites(favoriteRepository),
                         deleteFavorite: DeleteFavorite(favoriteRepository),
                         addFavorite: AddFavorite(favoriteRepository),
-                        getFavoriteStatus: GetFavoriteStatus(favoriteRepository),
+                        getFavoriteStatus:
+                            GetFavoriteStatus(favoriteRepository),
                       );
                     },
                   ),
@@ -459,7 +461,7 @@ class _AppWrapperState extends State<AppWrapper> {
         } else {
           // Address is not set, show the settings page
           return MaterialApp(
-            title: 'MTV App Settings',
+            title: 'DawnTV Settings',
             localizationsDelegates: const [
               AppLocalizationsDelegate(),
               GlobalMaterialLocalizations.delegate,

@@ -26,6 +26,27 @@ class _FavoritesPageState extends State<FavoritesPage> {
     });
   }
 
+  // 处理来自详情页的收藏状态变化通知
+  void _handleFavoriteStatusChanged(String key, bool isFavorite) {
+    // 直接更新当前的收藏列表状态，而不是重新加载整个列表
+    final currentState = context.read<FavoriteBloc>().state;
+    if (currentState is FavoritesLoaded) {
+      List<FavoriteItem> updatedFavorites;
+      if (isFavorite) {
+        // 如果是添加收藏，我们暂时不处理，因为详情页不会传递完整的收藏信息
+        // 实际应用中可能需要从服务器重新获取或使用缓存
+        return;
+      } else {
+        // 如果是取消收藏，从列表中移除
+        updatedFavorites = currentState.favorites
+            .where((favorite) => favorite.key != key)
+            .toList();
+      }
+      // 更新状态
+      context.read<FavoriteBloc>().emit(FavoritesLoaded(updatedFavorites));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -116,12 +137,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 return FavoriteCard(
                   favorite: favorite,
                   onTap: () {
-                    // 导航到详情页面
+                    // 导航到详情页面，并传递收藏状态变化回调
                     NavigationHelper.navigateToMovieDetail(
                       context: context,
                       title: favorite.title,
                       imageUrl: favorite.cover,
                       video: null, // 在实际应用中可能需要传递视频对象
+                      onFavoriteStatusChanged: _handleFavoriteStatusChanged,
                     );
                   },
                   onDelete: () {
@@ -141,11 +163,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
                             TextButton(
                               onPressed: () {
                                 Navigator.of(context).pop();
-                                // 在实际应用中，这里应该调用删除API
-                                // 并重新加载收藏列表
+                                // 直接删除指定的收藏项，而不是重新加载整个列表
                                 context
                                     .read<FavoriteBloc>()
-                                    .add(LoadFavorites());
+                                    .add(DeleteFavorite(favorite.key));
                               },
                               child: Text(localizations?.delete ?? 'Delete'),
                             ),

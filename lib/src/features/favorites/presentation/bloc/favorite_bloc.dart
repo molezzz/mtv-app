@@ -62,7 +62,17 @@ class FavoriteBloc extends Bloc<favorite_event.FavoriteEvent, FavoriteState> {
     try {
       final ok = await deleteFavorite(event.key);
       if (ok) {
-        add(favorite_event.LoadFavorites());
+        // Instead of reloading the entire list, update the current state
+        if (state is FavoritesLoaded) {
+          final currentFavorites = (state as FavoritesLoaded).favorites;
+          final updatedFavorites = currentFavorites
+              .where((favorite) => favorite.key != event.key)
+              .toList();
+          emit(FavoritesLoaded(updatedFavorites));
+        } else {
+          // Fallback to reloading if not in loaded state
+          add(favorite_event.LoadFavorites());
+        }
       } else {
         emit(FavoriteError('Failed to delete favorite'));
       }
@@ -78,7 +88,32 @@ class FavoriteBloc extends Bloc<favorite_event.FavoriteEvent, FavoriteState> {
     try {
       final ok = await addFavorite(event.key, event.favorite);
       if (ok) {
-        add(favorite_event.LoadFavorites());
+        // Instead of reloading the entire list, update the current state
+        if (state is FavoritesLoaded) {
+          final currentFavorites = (state as FavoritesLoaded).favorites;
+          // Create a new FavoriteItem from the added favorite
+          final newFavoriteItem = FavoriteItem(
+            key: event.key,
+            cover: event.favorite.cover,
+            title: event.favorite.title,
+            sourceName: event.favorite.sourceName,
+            totalEpisodes: event.favorite.totalEpisodes,
+            searchTitle: event.favorite.searchTitle,
+            year: event.favorite.year ?? '',
+            saveTime: event.favorite.saveTime,
+          );
+          // Check if the item already exists to avoid duplicates
+          final exists = currentFavorites
+              .any((favorite) => favorite.key == event.key);
+          if (!exists) {
+            final updatedFavorites = List<FavoriteItem>.from(currentFavorites)
+              ..add(newFavoriteItem);
+            emit(FavoritesLoaded(updatedFavorites));
+          }
+        } else {
+          // Fallback to reloading if not in loaded state
+          add(favorite_event.LoadFavorites());
+        }
       } else {
         emit(FavoriteError('Failed to add favorite'));
       }
