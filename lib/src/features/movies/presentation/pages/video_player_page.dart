@@ -410,12 +410,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void _seekToInitialPosition() {
     // 只执行一次
     if (_hasSeekedToInitialPosition) return;
-    
+
     // 检查是否有初始播放时间参数
     if (widget.initialPlayTime != null && widget.initialPlayTime! > 0) {
       final initialPosition = Duration(seconds: widget.initialPlayTime!);
       print('跳转到初始播放位置: $initialPosition');
-      
+
       // 延迟执行跳转，确保播放器已完全初始化
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -1199,7 +1199,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         }
       });
     }
-    
+
     // 检查是否需要跳转到初始播放位置
     if (!_hasSeekedToInitialPosition) {
       _seekToInitialPosition();

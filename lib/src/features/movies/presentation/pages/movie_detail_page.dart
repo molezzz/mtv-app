@@ -98,7 +98,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
         // Check favorite status
         if (_selectedVideo != null) {
-          final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+          final key =
+              '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
           _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
         }
       } else if (mounted) {
@@ -183,6 +184,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               setState(() {
                 _isFavorite = state.isFavorite;
               });
+            } else if (state is FavoritesLoaded) {
+              // 在添加或删除收藏后重新检查当前视频的收藏状态
+              if (_selectedVideo != null) {
+                final key =
+                    '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+                _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
+              }
+            } else if (state is FavoriteError) {
+              // 显示错误信息但不改变当前的收藏状态
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('操作失败: ${state.message}')),
+              );
             }
           },
           child: BlocBuilder<MovieBloc, MovieState>(
@@ -208,7 +221,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       _videoSources.isNotEmpty ? _videoSources.first : null;
                   // Check favorite status after video sources are loaded
                   if (_selectedVideo != null) {
-                    final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+                    final key =
+                        '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
                     _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
                   }
                 }
@@ -219,7 +233,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 // 如果数据已加载，显示内容而不是加载指示器
                 if (_dataLoaded) {
                   return _buildVideoDetail();
-                } 
+                }
                 return const Center(
                   child: CircularProgressIndicator(
                     color: Colors.orange,
@@ -249,23 +263,18 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       saveTime: DateTime.now().millisecondsSinceEpoch,
     );
 
+    // 恢复使用完整的key（包含"+"号）
     final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
 
     if (_isFavorite) {
       // 取消收藏
       _favoriteBloc?.add(favorite_event.DeleteFavorite(key));
-      setState(() {
-        _isFavorite = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已取消收藏')),
       );
     } else {
       // 添加收藏
       _favoriteBloc?.add(favorite_event.AddFavorite(key, favorite));
-      setState(() {
-        _isFavorite = true;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已添加到收藏')),
       );
@@ -603,6 +612,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                           _selectedVideo = source;
                         });
                         Navigator.pop(context);
+
+                        // 检查新选中视频的收藏状态
+                        final key =
+                            '${source.source ?? 'unknown'}+${source.id}';
+                        _favoriteBloc
+                            ?.add(favorite_event.CheckFavoriteStatus(key));
+
                         _playVideo(source, index);
                       },
                     ),

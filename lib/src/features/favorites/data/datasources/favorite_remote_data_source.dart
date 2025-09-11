@@ -37,8 +37,10 @@ class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
   @override
   Future<bool> addFavorite(String key, Favorite favorite) async {
     try {
+      // 对key进行URL编码，确保特殊字符如"+"被正确处理
+      final encodedKey = Uri.encodeComponent(key);
       final data = {
-        'key': key,
+        'key': encodedKey,
         'favorite': favorite.toJson(),
       };
 
@@ -62,7 +64,9 @@ class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
   @override
   Future<bool> deleteFavorite(String key) async {
     try {
-      await apiClient.dio.delete('/api/favorites?key=$key');
+      // 对key进行URL编码，确保特殊字符如"+"被正确处理
+      final encodedKey = Uri.encodeComponent(key);
+      await apiClient.dio.delete('/api/favorites?key=$encodedKey');
       return true;
     } on DioException catch (e) {
       throw Exception('Failed to delete favorite: ${e.message}');
@@ -72,7 +76,9 @@ class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
   @override
   Future<Favorite?> getFavoriteStatus(String key) async {
     try {
-      final response = await apiClient.dio.get('/api/favorites?key=$key');
+      // 对key进行URL编码，确保特殊字符如"+"被正确处理
+      final encodedKey = Uri.encodeComponent(key);
+      final response = await apiClient.dio.get('/api/favorites?key=$encodedKey');
       if (response.data != null) {
         return Favorite.fromJson(response.data as Map<String, dynamic>);
       }

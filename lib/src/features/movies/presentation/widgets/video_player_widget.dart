@@ -125,7 +125,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
       print('FPlayer 初始化成功！');
       print('======================\n');
-
     } catch (e) {
       print('FPlayer 初始化失败: $e');
       setState(() {
@@ -142,7 +141,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     await _fPlayer.setOption(FOption.hostCategory, "enable-snapshot", 1);
     await _fPlayer.setOption(FOption.hostCategory, "request-screen-on", 1);
     await _fPlayer.setOption(FOption.hostCategory, "request-audio-focus", 1);
-    
+
     // 网络和缓冲配置
     await _fPlayer.setOption(FOption.playerCategory, "reconnect", 20);
     await _fPlayer.setOption(FOption.playerCategory, "framedrop", 20);
@@ -150,7 +149,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
     await _fPlayer.setOption(FOption.playerCategory, "mediacodec", 1);
     await _fPlayer.setOption(FOption.playerCategory, "packet-buffering", 0);
     await _fPlayer.setOption(FOption.playerCategory, "soundtouch", 1);
-    
+
     print('FPlayer 配置选项设置完成');
   }
 
@@ -291,7 +290,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
       // 通知位置变化（跳转完成后）
       widget.onPositionChanged?.call(position);
-
     } catch (e) {
       print('跳转失败: $e');
       // 出错时也要重置状态

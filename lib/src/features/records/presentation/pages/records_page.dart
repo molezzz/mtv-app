@@ -122,7 +122,8 @@ class _RecordsPageState extends State<RecordsPage> {
                       height: 50,
                       child: CircularProgressIndicator(
                         strokeWidth: 4,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.orange),
                       ),
                     ),
                     SizedBox(height: 16),
@@ -181,7 +182,8 @@ class _RecordsPageState extends State<RecordsPage> {
                               const SizedBox(height: 16),
                               Text(
                                 localizations?.records ?? 'Records',
-                                style: Theme.of(context).textTheme.headlineMedium,
+                                style:
+                                    Theme.of(context).textTheme.headlineMedium,
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -212,7 +214,8 @@ class _RecordsPageState extends State<RecordsPage> {
                           ),
                           itemCount: _playRecords.length,
                           itemBuilder: (context, index) {
-                            final recordKey = _playRecords.keys.elementAt(index);
+                            final recordKey =
+                                _playRecords.keys.elementAt(index);
                             final record = _playRecords[recordKey]!;
 
                             return _buildRecordCard(record, localizations);
@@ -363,7 +366,7 @@ class _RecordsPageState extends State<RecordsPage> {
     if (parts.length >= 2) {
       final source = parts[0];
       final id = parts[1];
-      
+
       // 导航到视频播放页面，并传递初始播放时间
       Navigator.push(
         context,
@@ -381,42 +384,45 @@ class _RecordsPageState extends State<RecordsPage> {
       setState(() {
         _isFetchingVideoInfo = true;
       });
-      
+
       // 如果无法从searchTitle解析source和id，则尝试通过API搜索来获取视频信息
       try {
         // 从记录的标题搜索视频
         final prefs = await SharedPreferences.getInstance();
-        final serverUrl = prefs.getString('api_server_address') ?? 'http://localhost:3000';
+        final serverUrl =
+            prefs.getString('api_server_address') ?? 'http://localhost:3000';
         final apiClient = ApiClient(baseUrl: serverUrl);
         final dataSource = MovieRemoteDataSourceImpl(apiClient);
-        
+
         // 搜索视频
         final videoModels = await dataSource.searchVideos(record.title);
         if (videoModels.isNotEmpty) {
           // 转换VideoModel为Video实体
-          final videos = videoModels.map((model) => Video(
-            id: model.id,
-            title: model.title,
-            description: model.description,
-            pic: model.pic,
-            year: model.year,
-            note: model.note,
-            type: model.type,
-            source: model.source,
-            sourceName: model.sourceName,
-          )).toList();
-          
+          final videos = videoModels
+              .map((model) => Video(
+                    id: model.id,
+                    title: model.title,
+                    description: model.description,
+                    pic: model.pic,
+                    year: model.year,
+                    note: model.note,
+                    type: model.type,
+                    source: model.source,
+                    sourceName: model.sourceName,
+                  ))
+              .toList();
+
           // 使用第一个搜索结果作为主源
           final primaryVideo = videos.first;
           final videoSource = primaryVideo.source ?? '';
           final videoId = primaryVideo.id;
-          
+
           if (videoSource.isNotEmpty && videoId.isNotEmpty) {
             // 重置获取视频信息的状态
             setState(() {
               _isFetchingVideoInfo = false;
             });
-            
+
             // 导航到视频播放页面，传递所有搜索到的源
             Navigator.push(
               context,
@@ -436,7 +442,7 @@ class _RecordsPageState extends State<RecordsPage> {
             setState(() {
               _isFetchingVideoInfo = false;
             });
-            
+
             // 如果仍然缺少视频信息，则显示错误信息
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -449,7 +455,7 @@ class _RecordsPageState extends State<RecordsPage> {
           setState(() {
             _isFetchingVideoInfo = false;
           });
-          
+
           // 如果没有搜索到视频，则显示错误信息
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -462,7 +468,7 @@ class _RecordsPageState extends State<RecordsPage> {
         setState(() {
           _isFetchingVideoInfo = false;
         });
-        
+
         // 如果出现异常，则显示错误信息
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
