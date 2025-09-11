@@ -26,6 +26,7 @@ class VideoPlayerPage extends StatefulWidget {
   final List<Video>? videoSources;
   final int? selectedSourceIndex;
   final VoidCallback? onVideoEnded; // 添加视频结束回调
+  final int? initialPlayTime; // 添加初始播放时间参数
 
   const VideoPlayerPage({
     super.key,
@@ -36,6 +37,7 @@ class VideoPlayerPage extends StatefulWidget {
     this.videoSources,
     this.selectedSourceIndex,
     this.onVideoEnded,
+    this.initialPlayTime, // 添加初始播放时间参数
   });
 
   @override
@@ -69,6 +71,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Duration? _dragPosition; // UI层当前拖动的位置
   late MovieRemoteDataSource _dataSource; // 用于保存播放记录
   Timer? _playRecordTimer; // 定时保存播放记录
+  bool _hasSeekedToInitialPosition = false; // 是否已经跳转到初始位置
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
@@ -403,6 +406,34 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
+  // 在播放器初始化后跳转到初始播放位置
+  void _seekToInitialPosition() {
+    // 只执行一次
+    if (_hasSeekedToInitialPosition) return;
+    
+    // 检查是否有初始播放时间参数
+    if (widget.initialPlayTime != null && widget.initialPlayTime! > 0) {
+      final initialPosition = Duration(seconds: widget.initialPlayTime!);
+      print('跳转到初始播放位置: $initialPosition');
+      
+      // 延迟执行跳转，确保播放器已完全初始化
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _playerController.seekTo(initialPosition);
+            setState(() {
+              _hasSeekedToInitialPosition = true;
+            });
+          }
+        });
+      });
+    } else {
+      setState(() {
+        _hasSeekedToInitialPosition = true;
+      });
+    }
+  }
+
   // 启动播放记录定时器
   void _startPlayRecordTimer() {
     _playRecordTimer?.cancel();
@@ -427,6 +458,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         totalTime: _duration.inSeconds,
         saveTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
         year: _videoDetail!.year ?? '',
+        searchTitle: key, // 添加searchTitle字段，用于记录解析
       );
 
       await _dataSource.savePlayRecord(key, record);
@@ -732,34 +764,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     _isLoading = false;
                   });
                 },
-                onPositionChanged: (position) {
-                  // 如果在等待跳转完成，则当当前位置接近目标时结束拖动/缓冲状态
-                  if (_isSeeking && _seekTarget != null) {
-                    final diff = (position - _seekTarget!).inMilliseconds.abs();
-                    if (diff <= 800) {
-                      // 允许一定误差
-                      setState(() {
-                        _isSeeking = false;
-                        _isBuffering = false;
-                        _seekTarget = null;
-                        _dragPosition = null;
-                        _position = position; // 以播放器上报的位置为准
-                      });
-                      return;
-                    }
-                    // 未接近目标前不更新UI位置，保持停留在手松开的地方
-                    return;
-                  }
-                  // 正常更新位置
-                  if (!_isSeeking) {
-                    setState(() {
-                      _position = position;
-                      if (_isBuffering) {
-                        _isBuffering = false;
-                      }
-                    });
-                  }
-                },
+                onPositionChanged: _onPositionChanged,
                 onDurationChanged: (duration) {
                   setState(() {
                     _duration = duration;
@@ -1164,6 +1169,40 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return '$hours:$minutes:$seconds';
     } else {
       return '$minutes:$seconds';
+    }
+  }
+
+  void _onPositionChanged(Duration position) {
+    // 如果在等待跳转完成，则当当前位置接近目标时结束拖动/缓冲状态
+    if (_isSeeking && _seekTarget != null) {
+      final diff = (position - _seekTarget!).inMilliseconds.abs();
+      if (diff <= 800) {
+        // 允许一定误差
+        setState(() {
+          _isSeeking = false;
+          _isBuffering = false;
+          _seekTarget = null;
+          _dragPosition = null;
+          _position = position; // 以播放器上报的位置为准
+        });
+        return;
+      }
+      // 未接近目标前不更新UI位置，保持停留在手松开的地方
+      return;
+    }
+    // 正常更新位置
+    if (!_isSeeking) {
+      setState(() {
+        _position = position;
+        if (_isBuffering) {
+          _isBuffering = false;
+        }
+      });
+    }
+    
+    // 检查是否需要跳转到初始播放位置
+    if (!_hasSeekedToInitialPosition) {
+      _seekToInitialPosition();
     }
   }
 
