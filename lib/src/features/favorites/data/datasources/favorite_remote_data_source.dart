@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
@@ -7,6 +6,7 @@ abstract class FavoriteRemoteDataSource {
   Future<List<Favorite>> getFavorites();
   Future<bool> addFavorite(String key, Favorite favorite);
   Future<bool> deleteFavorite(String key);
+  Future<Favorite?> getFavoriteStatus(String key);
 }
 
 class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
@@ -66,6 +66,22 @@ class FavoriteRemoteDataSourceImpl implements FavoriteRemoteDataSource {
       return true;
     } on DioException catch (e) {
       throw Exception('Failed to delete favorite: ${e.message}');
+    }
+  }
+
+  @override
+  Future<Favorite?> getFavoriteStatus(String key) async {
+    try {
+      final response = await apiClient.dio.get('/api/favorites?key=$key');
+      if (response.data != null) {
+        return Favorite.fromJson(response.data as Map<String, dynamic>);
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      throw Exception('Failed to get favorite status: ${e.message}');
     }
   }
 }

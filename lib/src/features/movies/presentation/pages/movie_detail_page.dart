@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_event.dart'
     as favorite_event;
+import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_state.dart';
 import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
 
 class MovieDetailPage extends StatefulWidget {
@@ -93,6 +94,12 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         // 只有在数据未加载且没有传入视频源时才搜索视频源
         if (!_dataLoaded && widget.title != null) {
           _movieBloc?.add(SearchVideosEvent(widget.title!));
+        }
+
+        // Check favorite status
+        if (_selectedVideo != null) {
+          final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+          _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
         }
       } else if (mounted) {
         // 处理无服务器地址的情况
@@ -170,13 +177,49 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
         ),
-        body: BlocBuilder<MovieBloc, MovieState>(
-          builder: (context, state) {
-            // 关键修改：即使在加载状态，如果数据已加载，也要显示内容
-            if (state is MovieLoading) {
-              if (_dataLoaded) {
+        body: BlocListener<FavoriteBloc, FavoriteState>(
+          listener: (context, state) {
+            if (state is FavoriteStatusChecked) {
+              setState(() {
+                _isFavorite = state.isFavorite;
+              });
+            }
+          },
+          child: BlocBuilder<MovieBloc, MovieState>(
+            builder: (context, state) {
+              // 关键修改：即使在加载状态，如果数据已加载，也要显示内容
+              if (state is MovieLoading) {
+                if (_dataLoaded) {
+                  return _buildVideoDetail();
+                } else {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.orange,
+                      strokeWidth: 3,
+                    ),
+                  );
+                }
+              } else if (state is VideosLoaded) {
+                // 标记数据已加载
+                if (!_dataLoaded) {
+                  _dataLoaded = true;
+                  _videoSources = state.videos;
+                  _selectedVideo =
+                      _videoSources.isNotEmpty ? _videoSources.first : null;
+                  // Check favorite status after video sources are loaded
+                  if (_selectedVideo != null) {
+                    final key = '${_selectedVideo!.source ?? 'unknown'}+${_selectedVideo!.id}';
+                    _favoriteBloc?.add(favorite_event.CheckFavoriteStatus(key));
+                  }
+                }
                 return _buildVideoDetail();
+              } else if (state is MovieError) {
+                return _buildErrorState(state.message);
               } else {
+                // 如果数据已加载，显示内容而不是加载指示器
+                if (_dataLoaded) {
+                  return _buildVideoDetail();
+                } 
                 return const Center(
                   child: CircularProgressIndicator(
                     color: Colors.orange,
@@ -184,30 +227,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   ),
                 );
               }
-            } else if (state is VideosLoaded) {
-              // 标记数据已加载
-              if (!_dataLoaded) {
-                _dataLoaded = true;
-                _videoSources = state.videos;
-                _selectedVideo =
-                    _videoSources.isNotEmpty ? _videoSources.first : null;
-              }
-              return _buildVideoDetail();
-            } else if (state is MovieError) {
-              return _buildErrorState(state.message);
-            } else {
-              // 如果数据已加载，显示内容而不是加载指示器
-              if (_dataLoaded) {
-                return _buildVideoDetail();
-              }
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.orange,
-                  strokeWidth: 3,
-                ),
-              );
-            }
-          },
+            },
+          ),
         ),
       ),
     );

@@ -16,3 +16,9 @@ class AddFavorite extends FavoriteEvent {
 
   AddFavorite(this.key, this.favorite);
 }
+
+class CheckFavoriteStatus extends FavoriteEvent {
+  final String key;
+
+  CheckFavoriteStatus(this.key);
+}

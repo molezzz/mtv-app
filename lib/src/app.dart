@@ -25,6 +25,7 @@ import 'package:mtv_app/src/features/favorites/data/repositories/favorite_reposi
 import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorites.dart';
 import 'package:mtv_app/src/features/favorites/domain/usecases/delete_favorite.dart';
 import 'package:mtv_app/src/features/favorites/domain/usecases/add_favorite.dart';
+import 'package:mtv_app/src/features/favorites/domain/usecases/get_favorite_status.dart';
 import 'package:mtv_app/src/features/favorites/presentation/bloc/favorite_bloc.dart';
 
 class App extends StatefulWidget {
@@ -170,6 +171,7 @@ class _AppState extends State<App> {
                         getFavorites: GetFavorites(favoriteRepository),
                         deleteFavorite: DeleteFavorite(favoriteRepository),
                         addFavorite: AddFavorite(favoriteRepository),
+                        getFavoriteStatus: GetFavoriteStatus(favoriteRepository),
                       );
                     },
                   ),

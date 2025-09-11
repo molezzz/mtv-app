@@ -16,6 +16,12 @@ class FavoriteError extends FavoriteState {
   FavoriteError(this.message);
 }
 
+class FavoriteStatusChecked extends FavoriteState {
+  final bool isFavorite;
+
+  FavoriteStatusChecked(this.isFavorite);
+}
+
 class FavoriteItem {
   final String key;
   final String cover;

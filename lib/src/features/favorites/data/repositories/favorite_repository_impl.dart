@@ -21,4 +21,9 @@ class FavoriteRepositoryImpl implements FavoriteRepository {
   Future<bool> deleteFavorite(String key) async {
     return await remoteDataSource.deleteFavorite(key);
   }
+
+  @override
+  Future<Favorite?> getFavoriteStatus(String key) async {
+    return await remoteDataSource.getFavoriteStatus(key);
+  }
 }

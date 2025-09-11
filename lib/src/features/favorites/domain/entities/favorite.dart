@@ -4,7 +4,7 @@ class Favorite {
   final String sourceName;
   final int totalEpisodes;
   final String searchTitle;
-  final String year;
+  final String? year;
   final int? saveTime;
 
   Favorite({
@@ -13,7 +13,7 @@ class Favorite {
     required this.sourceName,
     required this.totalEpisodes,
     required this.searchTitle,
-    required this.year,
+    this.year,
     this.saveTime,
   });
 
@@ -23,8 +23,8 @@ class Favorite {
       title: json['title'] as String,
       sourceName: json['source_name'] as String,
       totalEpisodes: json['total_episodes'] as int,
-      searchTitle: json['search_title'] as String,
-      year: json['year'] as String,
+      searchTitle: json['search_title'] as String? ?? json['title'] as String,
+      year: json['year'] as String?,
       saveTime: json['save_time'] as int?,
     );
   }

@@ -4,4 +4,5 @@ abstract class FavoriteRepository {
   Future<List<Favorite>> getFavorites();
   Future<bool> addFavorite(String key, Favorite favorite);
   Future<bool> deleteFavorite(String key);
+  Future<Favorite?> getFavoriteStatus(String key);
 }
