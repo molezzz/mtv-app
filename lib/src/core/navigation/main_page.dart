@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtv_app/l10n/app_localizations.dart';
-import 'package:mtv_app/src/features/movies/presentation/pages/home_page.dart';
+import 'package:mtv_app/src/features/movies/presentation/pages/movies_page.dart';
 import 'package:mtv_app/src/features/movies/presentation/pages/variety_shows_page.dart';
 import 'package:mtv_app/src/features/tv_shows/presentation/pages/tv_shows_page.dart';
 import 'package:mtv_app/src/features/records/presentation/pages/records_page.dart';

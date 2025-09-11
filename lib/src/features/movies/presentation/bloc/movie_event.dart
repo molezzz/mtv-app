@@ -91,3 +91,35 @@ class GetVideoDetailEvent extends MovieEvent {
   @override
   List<Object> get props => [source, id];
 }
+
+class FetchMoreDoubanMovies extends MovieEvent {
+  final String type;
+  final String tag;
+  final int pageStart;
+
+  const FetchMoreDoubanMovies({
+    required this.type,
+    required this.tag,
+    required this.pageStart,
+  });
+
+  @override
+  List<Object> get props => [type, tag, pageStart];
+}
+
+class FetchMoreDoubanCategories extends MovieEvent {
+  final String kind;
+  final String category;
+  final String type;
+  final int start;
+
+  const FetchMoreDoubanCategories({
+    required this.kind,
+    required this.category,
+    required this.type,
+    required this.start,
+  });
+
+  @override
+  List<Object> get props => [kind, category, type, start];
+}

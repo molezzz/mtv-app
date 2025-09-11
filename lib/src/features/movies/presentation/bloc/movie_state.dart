@@ -28,15 +28,31 @@ class DoubanMoviesLoaded extends MovieState {
   final List<DoubanMovie> movies;
   final String category;
   final String type;
+  final bool hasReachedMax;
 
   const DoubanMoviesLoaded({
     required this.movies,
     required this.category,
     required this.type,
+    this.hasReachedMax = false,
   });
 
+  DoubanMoviesLoaded copyWith({
+    List<DoubanMovie>? movies,
+    String? category,
+    String? type,
+    bool? hasReachedMax,
+  }) {
+    return DoubanMoviesLoaded(
+      movies: movies ?? this.movies,
+      category: category ?? this.category,
+      type: type ?? this.type,
+      hasReachedMax: hasReachedMax ?? this.hasReachedMax,
+    );
+  }
+
   @override
-  List<Object> get props => [movies, category, type];
+  List<Object> get props => [movies, category, type, hasReachedMax];
 }
 
 class VideosLoaded extends MovieState {

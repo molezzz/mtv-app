@@ -32,6 +32,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     on<SelectCategory>(_onSelectCategory);
     on<FetchVideoDetail>(_onFetchVideoDetail);
     on<GetVideoDetailEvent>(_onGetVideoDetailEvent);
+    on<FetchMoreDoubanMovies>(_onFetchMoreDoubanMovies);
+    on<FetchMoreDoubanCategories>(_onFetchMoreDoubanCategories);
   }
 
   Future<void> _onFetchPopularMovies(
@@ -65,10 +67,39 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         movies: movies,
         category: event.tag,
         type: event.type,
+        hasReachedMax: movies.isEmpty,
       ));
     } catch (e) {
       print('Error fetching douban movies: $e');
       emit(MovieError(message: 'Failed to fetch douban movies: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onFetchMoreDoubanMovies(
+    FetchMoreDoubanMovies event,
+    Emitter<MovieState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is DoubanMoviesLoaded && !currentState.hasReachedMax) {
+      try {
+        final movies = await getDoubanMovies(
+          type: event.type,
+          tag: event.tag,
+          pageStart: event.pageStart,
+        );
+        if (movies.isEmpty) {
+          emit(currentState.copyWith(hasReachedMax: true));
+        } else {
+          emit(
+            currentState.copyWith(
+              movies: currentState.movies + movies,
+              hasReachedMax: false,
+            ),
+          );
+        }
+      } catch (e) {
+        emit(MovieError(message: 'Failed to fetch more douban movies: ${e.toString()}'));
+      }
     }
   }
 
@@ -91,10 +122,40 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         movies: movies,
         category: event.type,
         type: event.category,
+        hasReachedMax: movies.isEmpty,
       ));
     } catch (e) {
       print('Error fetching douban categories: $e');
       emit(MovieError(message: 'Failed to fetch douban categories: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onFetchMoreDoubanCategories(
+    FetchMoreDoubanCategories event,
+    Emitter<MovieState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is DoubanMoviesLoaded && !currentState.hasReachedMax) {
+      try {
+        final movies = await getDoubanCategories(
+          kind: event.kind,
+          category: event.category,
+          type: event.type,
+          start: event.start,
+        );
+        if (movies.isEmpty) {
+          emit(currentState.copyWith(hasReachedMax: true));
+        } else {
+          emit(
+            currentState.copyWith(
+              movies: currentState.movies + movies,
+              hasReachedMax: false,
+            ),
+          );
+        }
+      } catch (e) {
+        emit(MovieError(message: 'Failed to fetch more douban categories: ${e.toString()}'));
+      }
     }
   }
 
@@ -140,6 +201,7 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         movies: movies,
         category: event.category,
         type: event.type,
+        hasReachedMax: movies.isEmpty,
       ));
     } catch (e) {
       emit(MovieError(message: 'Failed to fetch category movies: ${e.toString()}'));
@@ -172,3 +234,4 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     }
   }
 }
+
