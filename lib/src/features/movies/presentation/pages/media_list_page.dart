@@ -331,50 +331,53 @@ class _MediaListPageState extends State<MediaListPage> {
       );
     }
 
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 9 / 16, // 9:16比例，适合电影海报
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: hasReachedMax ? movies.length : movies.length + 1,
-      itemBuilder: (context, index) {
-        if (index >= movies.length) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final movie = movies[index];
-        return MovieCard(
-          title: movie.title,
-          imageUrl: movie.imageUrl,
-          year: movie.year,
-          description: movie.description,
-          rating: movie.rating,
-          onTap: () {
-            final currentState = context.read<MovieBloc>().state;
-            Video? videoSource;
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: GridView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 9 / 16, // 9:16比例，适合电影海报
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: hasReachedMax ? movies.length : movies.length + 1,
+        itemBuilder: (context, index) {
+          if (index >= movies.length) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final movie = movies[index];
+          return MovieCard(
+            title: movie.title,
+            imageUrl: movie.imageUrl,
+            year: movie.year,
+            description: movie.description,
+            rating: movie.rating,
+            onTap: () {
+              final currentState = context.read<MovieBloc>().state;
+              Video? videoSource;
 
-            if (currentState is VideosLoaded) {
-              try {
-                videoSource = currentState.videos.firstWhere(
-                  (v) => v.title == movie.title,
-                );
-              } catch (e) {
-                videoSource = null;
+              if (currentState is VideosLoaded) {
+                try {
+                  videoSource = currentState.videos.firstWhere(
+                    (v) => v.title == movie.title,
+                  );
+                } catch (e) {
+                  videoSource = null;
+                }
               }
-            }
 
-            NavigationHelper.navigateToMovieDetail(
-              context: context,
-              title: movie.title,
-              imageUrl: movie.imageUrl,
-              video: videoSource,
-            );
-          },
-        );
-      },
+              NavigationHelper.navigateToMovieDetail(
+                context: context,
+                title: movie.title,
+                imageUrl: movie.imageUrl,
+                video: videoSource,
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -423,6 +426,14 @@ class _MediaListPageState extends State<MediaListPage> {
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
     return currentScroll >= (maxScroll * 0.9);
+  }
+
+  Future<void> _refreshData() async {
+    if (_isSearchMode && _searchQuery.isNotEmpty) {
+      context.read<MovieBloc>().add(SearchVideosEvent(_searchQuery));
+    } else {
+      _loadInitialData();
+    }
   }
 }
 
