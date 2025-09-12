@@ -84,8 +84,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       _selectedVideo = _videoSources[widget.selectedSourceIndex ?? 0];
       _dataLoaded = true;
       // 添加分辨率检测
+      print('Init中有传入视频源，准备添加PostFrameCallback调用分辨率检测');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        print('调用 _detectVideoResolutions');
+        print('Init PostFrameCallback执行: 调用 _detectVideoResolutions');
         _detectVideoResolutions();
       });
     } else {
@@ -224,19 +225,29 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
         ),
-        body: BlocListener<FavoriteBloc, FavoriteState>(
-          listener: (context, state) {
-            if (state is FavoriteStatusChecked) {
-              setState(() {
-                _isFavorite = state.isFavorite;
-              });
-            } else if (state is FavoriteError) {
-              // 显示错误信息但不改变当前的收藏状态
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('操作失败: ${state.message}')),
-              );
-            }
-          },
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<FavoriteBloc, FavoriteState>(
+              listener: (context, state) {
+                if (state is FavoriteStatusChecked) {
+                  setState(() {
+                    _isFavorite = state.isFavorite;
+                  });
+                } else if (state is FavoriteError) {
+                  // 显示错误信息但不改变当前的收藏状态
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('操作失败: ${state.message}')),
+                  );
+                }
+              },
+            ),
+            BlocListener<MovieBloc, MovieState>(
+              listener: (context, state) {
+                print('MovieBloc状态变化: $state');
+                _handleMovieState(state);
+              },
+            ),
+          ],
           child: BlocBuilder<MovieBloc, MovieState>(
             builder: (context, state) {
               // 关键修改：即使在加载状态，如果数据已加载，也要显示内容
@@ -258,6 +269,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   _videoSources = state.videos;
                   _selectedVideo =
                       _videoSources.isNotEmpty ? _videoSources.first : null;
+
+                  // 添加分辨率检测
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    print('BlocBuilder中的VideosLoaded状态触发分辨率检测');
+                    _detectVideoResolutions();
+                  });
+
                   // Check favorite status after video sources are loaded
                   if (_selectedVideo != null) {
                     final key =
@@ -316,8 +334,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       });
 
       // 添加分辨率检测
+      print('API加载完成，准备添加PostFrameCallback调用分辨率检测');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        print('调用 _detectVideoResolutions');
+        print('API加载PostFrameCallback执行: 调用 _detectVideoResolutions');
         _detectVideoResolutions();
       });
     } else if (state is MovieError) {
@@ -669,7 +688,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   final resolutionInfo = _resolutionInfoMap[source.id];
 
                   print(
-                      '显示播放源: index=$index, source=${source.source}, resolutionInfo=$resolutionInfo');
+                      '显示播放源: index=$index, source=${source.source}, sourceId=${source.id}, resolutionInfo=$resolutionInfo');
+                  print('当前_resolutionInfoMap内容: $_resolutionInfoMap');
 
                   return Card(
                     color: isSelected
@@ -759,6 +779,26 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                   ),
                                 ),
                               ],
+                            )
+                          else
+                            // 显示检测中状态
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[600],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '检测分辨率中...',
+                                  style: TextStyle(
+                                    color: Colors.grey[300],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
                             ),
                         ],
                       ),
