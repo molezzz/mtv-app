@@ -774,6 +774,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       ),
                     Expanded(
                       child: ListView.builder(
+                        physics: const ClampingScrollPhysics(),
                         key: const PageStorageKey('episode_list'),
                         itemCount: _videoSources.length,
                         itemBuilder: (context, index) {
