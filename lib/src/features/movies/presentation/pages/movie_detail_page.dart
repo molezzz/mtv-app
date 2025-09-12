@@ -638,13 +638,14 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
           title: const Text('请选择操作', style: TextStyle(color: Colors.white)),
-          content: Text('您想如何播放: ${source.sourceName ?? source.source ?? '未知源'}?',
+          content: Text(
+              '您想如何播放: ${source.sourceName ?? source.source ?? '未知源'}?',
               style: TextStyle(color: Colors.grey[300])),
           actionsAlignment: MainAxisAlignment.spaceEvenly,
           actions: <Widget>[
             TextButton(
-              child:
-                  const Text('投屏', style: TextStyle(color: Colors.orange, fontSize: 16)),
+              child: const Text('投屏',
+                  style: TextStyle(color: Colors.orange, fontSize: 16)),
               onPressed: () {
                 Navigator.of(context).pop(); // Close the dialog
                 _showDevicePicker(); // This existing method uses _selectedVideo, which is already set
@@ -674,7 +675,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
@@ -715,8 +716,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   ),
                 ),
               ),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 300),
+            Expanded(
               child: ListView.builder(
                 key: const PageStorageKey('episode_list'),
                 itemCount: _videoSources.length,
@@ -1152,8 +1152,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
 
     try {
-      final videoDetail = await _movieBloc!
-          .getVideoDetailForCasting(_selectedVideo!.source!, _selectedVideo!.id);
+      final videoDetail = await _movieBloc!.getVideoDetailForCasting(
+          _selectedVideo!.source!, _selectedVideo!.id);
 
       if (videoDetail.episodes == null || videoDetail.episodes!.isEmpty) {
         // 修改这里：使用Fluttertoast显示错误信息在顶部
