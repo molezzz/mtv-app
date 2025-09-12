@@ -972,11 +972,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
   }
 
-  /// 检测所有视频源的分辨率信息
+  /// 检测所有视频源的分辨率信息（流式更新）
   Future<void> _detectVideoResolutions() async {
-    print('=== 开始检测视频源分辨率 ===');
-    print('视频源数量: ${_videoSources.length}');
-
+    print('=== 开始检测视频源分辨率 (流式) ===');
     if (_videoSources.isEmpty) {
       print('视频源为空，跳过检测');
       return;
@@ -984,134 +982,83 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
     setState(() {
       _resolutionDetectionInProgress = true;
+      _resolutionInfoMap.clear(); // 清空旧数据
+      _highestQuality = null;
     });
     _resolutionUpdateController.add(null);
 
     try {
-      // 为每个视频源获取详细信息并提取第一集URL进行分辨率检测
-      final Map<String, String> sourceUrls = {}; // 存储源ID到第一集URL的映射
-      final Map<String, String> sourceIds = {}; // 存储URL到源ID的映射
-
-      // 并行获取所有视频源的详细信息
-      final List<Future<void>> detailFutures = [];
-      for (int i = 0; i < _videoSources.length; i++) {
-        final source = _videoSources[i];
-        print('检查视频源 $i: id=${source.id}, source=${source.source}');
-        if (source.source != null &&
-            source.source!.isNotEmpty &&
-            source.id.isNotEmpty) {
-          final future =
-              _getVideoDetailForResolution(source.source!, source.id, i)
-                  .then((url) {
-            if (url != null) {
-              sourceUrls[source.id] = url; // 使用source.id作为键
-              sourceIds[url] = source.id; // 建立URL到源ID的映射
-              print('获取到源${source.source}的视频URL: $url');
-            } else {
-              print('源${source.source}没有返回有效的视频URL');
-            }
-          }).catchError((e) {
-            print('获取源${source.source}的视频详情失败: $e');
-          });
-          detailFutures.add(future);
-        } else {
-          print('跳过无效视频源: index=$i, id=${source.id}, source=${source.source}');
-        }
-      }
-
-      // 等待所有详细信息获取完成
-      print('等待所有视频详情获取完成，任务数量: ${detailFutures.length}');
+      // 1. 获取所有源的播放URL
+      final Map<String, String> sourceUrls = {}; // sourceId -> m3u8Url
+      final detailFutures = _videoSources.map((source) {
+        return _getVideoDetailForResolution(
+                source.source!, source.id, _videoSources.indexOf(source))
+            .then((url) {
+          if (url != null) {
+            sourceUrls[source.id] = url;
+          }
+        });
+      });
       await Future.wait(detailFutures);
-      print('所有视频详情获取完成');
-
-      // 打印映射信息用于调试
-      print('sourceUrls映射: $sourceUrls');
-      print('sourceIds映射: $sourceIds');
+      print('所有视频详情获取完成，有效URL数量: ${sourceUrls.length}');
 
       if (sourceUrls.isEmpty) {
-        print('没有获取到任何有效的视频URL，跳过检测');
-        setState(() {
-          _resolutionDetectionInProgress = false;
-        });
+        setState(() => _resolutionDetectionInProgress = false);
         _resolutionUpdateController.add(null);
         return;
       }
 
-      // 提取URL列表进行分辨率检测
-      final List<String> urls = sourceUrls.values.toList();
-
-      // 批量获取分辨率信息
-      print('开始批量获取分辨率信息，URL数量: ${urls.length}');
-      print('URL列表: $urls');
-
-      final resolutionMap =
-          await VideoResolutionDetector.getVideoResolutionsFromM3u8List(urls);
-      print('分辨率信息获取完成，结果数量: ${resolutionMap.length}');
-      print('分辨率映射: $resolutionMap');
-
-      // 更新分辨率信息映射
-      String? highestQuality;
-      final Map<String, VideoResolutionInfo> newResolutions = {};
-
-      // 遍历源ID到URL的映射
+      // 2. 并行监听所有源的流式检测
+      final detectionCompleters = <Completer<void>>[];
       sourceUrls.forEach((sourceId, url) {
-        print('处理结果: sourceId=$sourceId, url=$url');
+        final completer = Completer<void>();
+        detectionCompleters.add(completer);
 
-        if (resolutionMap.containsKey(url)) {
-          final resolutionInfo = resolutionMap[url]!;
-          print('设置分辨率信息: sourceId=$sourceId, url=$url, info=$resolutionInfo');
-          newResolutions[sourceId] = resolutionInfo;
-
-          // 更新最高分辨率
-          final quality = resolutionInfo.quality;
-          print('当前质量: $quality');
-
-          if (highestQuality == null && quality != 'N/A') {
-            highestQuality = quality;
-            print('设置初始最高质量: $highestQuality');
-          } else if (quality != 'N/A' && highestQuality != null) {
-            // 根据分辨率等级确定最高质量
-            final currentRank = _getQualityRank(highestQuality!); // 添加感叹号确保非空
-            final newRank = _getQualityRank(quality);
-            print(
-                '质量等级比较: $highestQuality($currentRank) vs $quality($newRank)');
-
-            if (newRank > currentRank) {
-              highestQuality = quality;
-              print('更新最高质量: $highestQuality');
-            }
-          } else if (quality != 'N/A' && highestQuality == null) {
-            highestQuality = quality;
-            print('设置最高质量: $highestQuality');
-          }
-        } else {
-          print('未找到URL的分辨率信息: url=$url');
-        }
+        VideoResolutionDetector.streamVideoResolutionInfo(url).listen(
+          (info) {
+            if (!mounted) return;
+            setState(() {
+              _resolutionInfoMap[sourceId] = info;
+              // 更新最高画质
+              final quality = info.quality;
+              if (quality != 'N/A' && quality != '错误') {
+                final currentRank = _getQualityRank(_highestQuality ?? 'N/A');
+                final newRank = _getQualityRank(quality);
+                if (newRank > currentRank) {
+                  _highestQuality = quality;
+                }
+              }
+            });
+            _resolutionUpdateController.add(null); // 通知UI刷新
+          },
+          onError: (e) {
+            if (!mounted) return;
+            setState(() {
+              _resolutionInfoMap[sourceId] = VideoResolutionInfo(
+                  quality: '错误', loadSpeed: 'N/A', pingTime: 9999);
+            });
+            _resolutionUpdateController.add(null);
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
       });
 
-      // 一次性更新状态
-      if (newResolutions.isNotEmpty || highestQuality != null) {
-        setState(() {
-          _resolutionInfoMap.addAll(newResolutions);
-          if (highestQuality != null) {
-            _highestQuality = highestQuality;
-            print('最终最高分辨率: $highestQuality');
-          } else {
-            print('没有检测到有效的最高分辨率');
-          }
-        });
-        _resolutionUpdateController.add(null);
-      }
-
-      print('=== 视频源分辨率检测完成 ===');
+      // 等待所有检测流完成
+      await Future.wait(detectionCompleters.map((c) => c.future));
     } catch (e, stackTrace) {
       print('检测视频分辨率时出错: $e');
       print('错误堆栈: $stackTrace');
     } finally {
-      setState(() {
-        _resolutionDetectionInProgress = false;
-      });
-      _resolutionUpdateController.add(null);
+      if (mounted) {
+        setState(() {
+          _resolutionDetectionInProgress = false;
+        });
+        _resolutionUpdateController.add(null);
+        print('=== 视频源分辨率检测完成 (流式) ===');
+      }
     }
   }
 

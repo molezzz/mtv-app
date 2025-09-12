@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'dart:math';
 
 /// 视频分辨率检测结果
 class VideoResolutionInfo {
@@ -60,7 +62,7 @@ class VideoResolutionDetector {
       final width = int.tryParse(match.group(1) ?? '0') ?? 0;
       final height = int.tryParse(match.group(2) ?? '0') ?? 0;
       // 返回较大的维度作为参考
-      return width > height ? width : height;
+      return max(width, height);
     }
 
     // 如果没有找到明确的分辨率信息，返回默认值
@@ -106,12 +108,14 @@ class VideoResolutionDetector {
         final durationInMillis = endTime - startTime;
 
         if (durationInMillis > 0) {
-          final speedInKBps = sizeInBytes / 1024 / (durationInMillis / 1000);
+          // 速度计算单位为 KB/s
+          final speedInKBps = (sizeInBytes / 1024) / (durationInMillis / 1000);
 
           if (speedInKBps >= 1024) {
-            return '${(speedInKBps / 1024).toStringAsFixed(1)} MB/s';
+            // 如果速度大于等于1024KB/s，转换为MB/s
+            return '${(speedInKBps / 1024).toStringAsFixed(2)} MB/s';
           } else {
-            return '${speedInKBps.toStringAsFixed(1)} KB/s';
+            return '${speedInKBps.toStringAsFixed(2)} KB/s';
           }
         }
       }
@@ -119,6 +123,45 @@ class VideoResolutionDetector {
     } catch (e) {
       return 'N/A';
     }
+  }
+
+  /// 从M3U8主播放列表内容中找到第一个子播放列表的URL
+  static String? _findFirstVariantPlaylistUrl(String m3u8Content, String baseUrl) {
+    final lines = const LineSplitter().convert(m3u8Content);
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+      if (trimmedLine.isNotEmpty && !trimmedLine.startsWith('#')) {
+        // 在主播放列表中，第一个非注释行通常是子播放列表
+        try {
+          return Uri.parse(baseUrl).resolve(trimmedLine).toString();
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 从M3U8子播放列表内容中找到第一个视频分片(.ts)的URL并解析为绝对路径
+  static String? _findFirstSegmentUrl(String m3u8Content, String baseUrl) {
+    final lines = const LineSplitter().convert(m3u8Content);
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+      // 找到第一个非注释、非空的行
+      if (trimmedLine.isNotEmpty && !trimmedLine.startsWith('#')) {
+        // 简单判断，避免选中M3U8主列表中的子列表
+        if (!trimmedLine.endsWith('.m3u8')) {
+          try {
+            // 将相对URL转换为绝对URL
+            return Uri.parse(baseUrl).resolve(trimmedLine).toString();
+          } catch (e) {
+            // URL解析失败
+            return null;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /// 从M3U8 URL获取视频分辨率信息
@@ -131,14 +174,36 @@ class VideoResolutionDetector {
       // 并行执行Ping测量和M3U8内容获取
       final pingFuture = _measurePing(m3u8Url);
       final m3u8Response = await _dio.get(m3u8Url);
-      final downloadSpeedFuture = _measureDownloadSpeed(m3u8Url);
+      final originalM3u8Content = m3u8Response.data.toString();
+      String m3u8ContentForSpeed = originalM3u8Content;
+      String baseUrlForSpeed = m3u8Url;
 
+      // 检查是否为主播放列表，如果是，则获取第一个子播放列表的内容用于测速
+      if (originalM3u8Content.contains('#EXT-X-STREAM-INF')) {
+        final firstVariantUrl = _findFirstVariantPlaylistUrl(originalM3u8Content, m3u8Url);
+        if (firstVariantUrl != null) {
+          final variantResponse = await _dio.get(firstVariantUrl);
+          m3u8ContentForSpeed = variantResponse.data.toString();
+          baseUrlForSpeed = firstVariantUrl;
+        }
+      }
+
+      String loadSpeed;
+      // 从可能已更新的M3U8内容中找到第一个视频分片(.ts)的URL
+      final firstSegmentUrl = _findFirstSegmentUrl(m3u8ContentForSpeed, baseUrlForSpeed);
+
+      if (firstSegmentUrl != null) {
+        // 使用分片URL来测试下载速度，结果更准确
+        loadSpeed = await _measureDownloadSpeed(firstSegmentUrl);
+      } else {
+        // 如果找不到分片，则返回'N/A'
+        loadSpeed = 'N/A';
+      }
+      
       final pingTime = await pingFuture;
-      final m3u8Content = m3u8Response.data.toString();
-      final loadSpeed = await downloadSpeedFuture;
 
-      // 从M3U8内容中提取分辨率信息
-      final width = _extractWidthFromM3u8(m3u8Content);
+      // 从原始M3U8内容中提取分辨率信息
+      final width = _extractWidthFromM3u8(originalM3u8Content);
       final quality = width > 0 ? _getQualityFromWidth(width) : 'N/A';
 
       return VideoResolutionInfo(
@@ -169,5 +234,66 @@ class VideoResolutionDetector {
     await Future.wait(futures);
 
     return results;
+  }
+
+  /// [新增] 以流的形式分步获取视频信息。
+  /// 1. 立刻返回分辨率和Ping，速度为"测速中..."。
+  /// 2. 后台完成测速后，返回包含最终速度的完整信息。
+  static Stream<VideoResolutionInfo> streamVideoResolutionInfo(
+      String m3u8Url) async* {
+    _initDio();
+
+    try {
+      // 步骤 1: 并行执行快速操作 (Ping 和 M3U8下载)
+      final pingFuture = _measurePing(m3u8Url);
+      final m3u8Response = await _dio.get(m3u8Url);
+      final originalM3u8Content = m3u8Response.data.toString();
+
+      final width = _extractWidthFromM3u8(originalM3u8Content);
+      final quality = width > 0 ? _getQualityFromWidth(width) : 'N/A';
+      final pingTime = await pingFuture;
+
+      // 步骤 2: 通过 stream 第一次返回数据 (包含占位符)
+      yield VideoResolutionInfo(
+        quality: quality,
+        pingTime: pingTime,
+        loadSpeed: '测速中...', // 占位符
+      );
+
+      // 步骤 3: 执行耗时的测速操作
+      String m3u8ContentForSpeed = originalM3u8Content;
+      String baseUrlForSpeed = m3u8Url;
+
+      if (originalM3u8Content.contains('#EXT-X-STREAM-INF')) {
+        final firstVariantUrl =
+            _findFirstVariantPlaylistUrl(originalM3u8Content, m3u8Url);
+        if (firstVariantUrl != null) {
+          final variantResponse = await _dio.get(firstVariantUrl);
+          m3u8ContentForSpeed = variantResponse.data.toString();
+          baseUrlForSpeed = firstVariantUrl;
+        }
+      }
+
+      final firstSegmentUrl =
+          _findFirstSegmentUrl(m3u8ContentForSpeed, baseUrlForSpeed);
+      String loadSpeed = 'N/A';
+      if (firstSegmentUrl != null) {
+        loadSpeed = await _measureDownloadSpeed(firstSegmentUrl);
+      }
+
+      // 步骤 4: 通过 stream 第二次返回最终数据
+      yield VideoResolutionInfo(
+        quality: quality,
+        pingTime: pingTime,
+        loadSpeed: loadSpeed,
+      );
+    } catch (e) {
+      // 错误处理: 返回错误信息
+      yield VideoResolutionInfo(
+        quality: '错误',
+        loadSpeed: 'N/A',
+        pingTime: 9999,
+      );
+    }
   }
 }

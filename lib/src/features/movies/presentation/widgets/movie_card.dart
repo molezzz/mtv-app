@@ -76,7 +76,6 @@ class MovieCard extends StatelessWidget {
                       maxLines: 1, // 只显示一行标题
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2), // 减小间距
                     // 年份和评分
                     Row(
                       children: [
