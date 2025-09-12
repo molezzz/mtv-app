@@ -72,6 +72,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   final Map<String, VideoResolutionInfo> _resolutionInfoMap =
       {}; // 存储每个视频源的分辨率信息
   String? _highestQuality; // 存储所有播放源中的最高分辨率
+  bool _resolutionDetectionInProgress = false;
 
   @override
   void initState() {
@@ -679,7 +680,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             Container(
               constraints: const BoxConstraints(maxHeight: 300),
               child: ListView.builder(
-                shrinkWrap: true,
+                key: const PageStorageKey('episode_list'),
                 itemCount: _videoSources.length,
                 itemBuilder: (context, index) {
                   final source = _videoSources[index];
@@ -781,7 +782,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                               ],
                             )
                           else
-                            // 显示检测中状态
+                            // 显示检测中或未知状态
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Container(
@@ -792,7 +793,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  '检测分辨率中...',
+                                  _resolutionDetectionInProgress
+                                      ? '检测分辨率中...'
+                                      : '未知',
                                   style: TextStyle(
                                     color: Colors.grey[300],
                                     fontSize: 12,
@@ -876,6 +879,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       return;
     }
 
+    setState(() {
+      _resolutionDetectionInProgress = true;
+    });
+
     try {
       // 为每个视频源获取详细信息并提取第一集URL进行分辨率检测
       final Map<String, String> sourceUrls = {}; // 存储源ID到第一集URL的映射
@@ -936,6 +943,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
       // 更新分辨率信息映射
       String? highestQuality;
+      final Map<String, VideoResolutionInfo> newResolutions = {};
 
       // 遍历源ID到URL的映射
       sourceUrls.forEach((sourceId, url) {
@@ -944,10 +952,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         if (resolutionMap.containsKey(url)) {
           final resolutionInfo = resolutionMap[url]!;
           print('设置分辨率信息: sourceId=$sourceId, url=$url, info=$resolutionInfo');
-          setState(() {
-            // 使用sourceId作为键存储分辨率信息，与_showEpisodeSelector中使用的键保持一致
-            _resolutionInfoMap[sourceId] = resolutionInfo;
-          });
+          newResolutions[sourceId] = resolutionInfo;
 
           // 更新最高分辨率
           final quality = resolutionInfo.quality;
@@ -976,20 +981,27 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         }
       });
 
-      // 更新最高分辨率
-      if (highestQuality != null) {
-        print('最终最高分辨率: $highestQuality');
+      // 一次性更新状态
+      if (newResolutions.isNotEmpty || highestQuality != null) {
         setState(() {
-          _highestQuality = highestQuality;
+          _resolutionInfoMap.addAll(newResolutions);
+          if (highestQuality != null) {
+            _highestQuality = highestQuality;
+            print('最终最高分辨率: $highestQuality');
+          } else {
+            print('没有检测到有效的最高分辨率');
+          }
         });
-      } else {
-        print('没有检测到有效的最高分辨率');
       }
 
       print('=== 视频源分辨率检测完成 ===');
     } catch (e, stackTrace) {
       print('检测视频分辨率时出错: $e');
       print('错误堆栈: $stackTrace');
+    } finally {
+      setState(() {
+        _resolutionDetectionInProgress = false;
+      });
     }
   }
 
