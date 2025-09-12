@@ -6,7 +6,7 @@ void main() {
   group('Resolution Detection Final Tests', () {
     test('Video entity should properly store quality information', () {
       // 创建一个包含质量信息的视频对象
-      final video = Video(
+      const video = Video(
         id: 'test123',
         title: 'Test Video',
         source: 'test_source',
@@ -24,7 +24,7 @@ void main() {
 
     test('Test resolution detection with valid M3U8 URL', () async {
       // 使用一个公开的M3U8测试URL
-      final testUrl = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+      const testUrl = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
 
       try {
         final resolutionInfo =

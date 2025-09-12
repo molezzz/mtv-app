@@ -4,7 +4,7 @@ import 'package:mtv_app/src/features/movies/data/models/play_record_model.dart';
 void main() {
   group('PlayRecordModel', () {
     test('should create a PlayRecordModel instance', () {
-      final record = PlayRecordModel(
+      const record = PlayRecordModel(
         title: 'Test Movie',
         sourceName: 'Test Source',
         cover: 'https://example.com/cover.jpg',
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('should serialize and deserialize correctly', () {
-      final record = PlayRecordModel(
+      const record = PlayRecordModel(
         title: 'Test Movie',
         sourceName: 'Test Source',
         cover: 'https://example.com/cover.jpg',
