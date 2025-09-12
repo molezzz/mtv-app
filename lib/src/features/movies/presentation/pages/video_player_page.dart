@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_source.dart';
 import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
+import 'package:mtv_app/src/core/utils/video_source_helper.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoSource;
@@ -28,6 +29,7 @@ class VideoPlayerPage extends StatefulWidget {
   final int? selectedSourceIndex;
   final VoidCallback? onVideoEnded; // 添加视频结束回调
   final int? initialPlayTime; // 添加初始播放时间参数
+  final Map<String, VideoResolutionInfo>? resolutionInfoMap;
 
   const VideoPlayerPage({
     super.key,
@@ -39,6 +41,7 @@ class VideoPlayerPage extends StatefulWidget {
     this.selectedSourceIndex,
     this.onVideoEnded,
     this.initialPlayTime, // 添加初始播放时间参数
+    this.resolutionInfoMap,
   });
 
   @override
@@ -75,24 +78,48 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _hasSeekedToInitialPosition = false; // 是否已经跳转到初始位置
 
   // 添加分辨率信息映射
-  final Map<int, VideoResolutionInfo> _resolutionInfoMap = {};
+  Map<String, VideoResolutionInfo> _resolutionInfoMap = {};
+  VideoSourceHelper? _videoSourceHelper;
+  bool _resolutionDetectionInProgress = false;
+  final _resolutionUpdateController = StreamController<void>.broadcast();
+
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
   @override
   void initState() {
     super.initState();
-    print('VideoPlayerPage initState 开始');
     _videoSources = widget.videoSources;
     _currentSourceIndex = widget.selectedSourceIndex ?? 0;
+    _resolutionInfoMap = widget.resolutionInfoMap ?? {};
+
+    _videoSourceHelper = VideoSourceHelper(
+      onUpdate: (resolutionMap, sortedSources) {
+        if (!mounted) return;
+        setState(() {
+          _resolutionInfoMap = resolutionMap;
+          _videoSources = sortedSources;
+        });
+        _resolutionUpdateController.add(null);
+      },
+      onLoadingStateChanged: (isLoading) {
+        if (!mounted) return;
+        setState(() {
+          _resolutionDetectionInProgress = isLoading;
+        });
+        _resolutionUpdateController.add(null);
+      },
+    );
+
+    if (_videoSources != null && _resolutionInfoMap.isEmpty) {
+      _videoSourceHelper?.detectAndSortSources(_videoSources!);
+    }
+
     _initializeVideoPlayer();
     _setScreenToLandscape();
     WakelockPlus.enable(); // 保持屏幕常亮
     _checkCastingStatus();
     _initializeDataSource(); // 初始化数据源
-    print('调用 _detectVideoResolutions');
-    _detectVideoResolutions(); // 添加这一行，检测视频源分辨率
-    print('VideoPlayerPage initState 结束');
   }
 
   @override
@@ -103,6 +130,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _savePlayRecord(); // 页面销毁前保存一次播放记录
     _setScreenToPortrait();
     WakelockPlus.disable(); // 恢复屏幕锁定
+    _resolutionUpdateController.close();
     // 只在移动平台停止设备发现
     if (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS) {
@@ -301,21 +329,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         ? _videoSources![_currentSourceIndex]
         : null;
 
-    print('\n=== 获取视频详情调试 ===');
-    print('当前选中的源索引: $_currentSourceIndex');
-    print('源总数量: ${_videoSources?.length ?? 0}');
-    print('当前源信息: $currentSource');
-    print('Widget传入参数:');
-    print('  - videoSource: ${widget.videoSource}');
-    print('  - videoId: ${widget.videoId}');
-    print('  - episodeUrl: ${widget.episodeUrl}');
-    print('===========================\n');
-
     if (currentSource != null) {
       // 使用当前选中的视频源信息
       final source = currentSource.source ?? widget.videoSource;
       final id = currentSource.id;
-      print('使用当前源信息: source=$source, id=$id');
 
       context.read<MovieBloc>().add(
             GetVideoDetailEvent(source, id),
@@ -324,15 +341,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       // 监听状态变化
       await for (final state in context.read<MovieBloc>().stream) {
         if (state is VideoDetailLoaded) {
-          print('\n=== 视频详情加载成功 ===');
-          print('视频标题: ${state.videoDetail.title}');
-          print('剧集数量: ${state.videoDetail.episodes?.length ?? 0}');
-          print('剧集列表:');
-          for (int i = 0; i < (state.videoDetail.episodes?.length ?? 0); i++) {
-            print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
-          }
-          print('=========================\n');
-
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -344,23 +352,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       }
     } else {
       // 使用传入的参数
-      print('使用Widget传入参数: source=${widget.videoSource}, id=${widget.videoId}');
-
       context.read<MovieBloc>().add(
             GetVideoDetailEvent(widget.videoSource, widget.videoId),
           );
 
       await for (final state in context.read<MovieBloc>().stream) {
         if (state is VideoDetailLoaded) {
-          print('\n=== 视频详情加载成功 ===');
-          print('视频标题: ${state.videoDetail.title}');
-          print('剧集数量: ${state.videoDetail.episodes?.length ?? 0}');
-          print('剧集列表:');
-          for (int i = 0; i < (state.videoDetail.episodes?.length ?? 0); i++) {
-            print('  第${i + 1}集: ${state.videoDetail.episodes![i]}');
-          }
-          print('=========================\n');
-
           setState(() {
             _videoDetail = state.videoDetail;
             _episodes = state.videoDetail.episodes ?? [];
@@ -377,23 +374,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     try {
       _disposeControllers();
 
-      // 添加调试日志：检查传入的视频URL
-      print('\n=== 播放视频URL调试 ===');
-      print('传入的videoUrl: $videoUrl');
-      print('当前选择的剧集索引: $_currentEpisodeIndex');
-      print('总剧集数量: ${_episodes.length}');
-
-      // 验证URL有效性
-      if (videoUrl.isEmpty) {
-        throw Exception('视频URL为空');
-      }
-
-      if (!videoUrl.startsWith('http')) {
+      if (videoUrl.isEmpty || !videoUrl.startsWith('http')) {
         throw Exception('无效的视频URL格式: $videoUrl');
       }
-
-      print('使用实际播放地址: $videoUrl');
-      print('======================\n');
 
       _currentVideoUrl = videoUrl; // 保存当前播放URL
 
@@ -405,7 +388,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       // 启动播放记录定时器
       _startPlayRecordTimer();
     } catch (e) {
-      print('播放视频URL处理失败: $e');
       setState(() {
         _hasError = true;
         _errorMessage = '播放器初始化失败: ${e.toString()}';
@@ -422,7 +404,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     // 检查是否有初始播放时间参数
     if (widget.initialPlayTime != null && widget.initialPlayTime! > 0) {
       final initialPosition = Duration(seconds: widget.initialPlayTime!);
-      print('跳转到初始播放位置: $initialPosition');
 
       // 延迟执行跳转，确保播放器已完全初始化
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -470,9 +451,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       );
 
       await _dataSource.savePlayRecord(key, record);
-      print('播放记录已保存: ${record.title}');
     } catch (e) {
-      print('保存播放记录失败: $e');
+      // silent fail
     }
   }
 
@@ -571,119 +551,123 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.black87,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '选择播放源',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 300),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _videoSources!.length,
-                itemBuilder: (context, index) {
-                  final source = _videoSources![index];
-                  final isSelected = index == _currentSourceIndex;
-                  // 获取该源的分辨率信息
-                  final resolutionInfo = _resolutionInfoMap[index];
-
-                  print(
-                      '显示播放源: index=$index, source=${source.source}, resolutionInfo=$resolutionInfo');
-
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor:
-                          isSelected ? Colors.orange : Colors.grey[600]!,
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
+      builder: (context) {
+        return StreamBuilder<void>(
+          stream: _resolutionUpdateController.stream,
+          builder: (context, snapshot) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '选择播放源',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    title: Text(
-                      source.sourceName ?? source.source ?? '播放源${index + 1}',
-                      style: TextStyle(
-                        color: isSelected ? Colors.orange : Colors.white,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (source.note != null)
-                          Text(
-                            source.note!,
-                            style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _videoSources!.length,
+                      itemBuilder: (context, index) {
+                        final source = _videoSources![index];
+                        final isSelected = index == _currentSourceIndex;
+                        final resolutionInfo = _resolutionInfoMap[source.id];
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                isSelected ? Colors.orange : Colors.grey[600]!,
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
                           ),
-                        // 显示分辨率和速度信息
-                        if (resolutionInfo != null)
-                          Row(
+                          title: Text(
+                            source.sourceName ?? source.source ?? '播放源${index + 1}',
+                            style: TextStyle(
+                              color: isSelected ? Colors.orange : Colors.white,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 分辨率标签
-                              if (resolutionInfo.quality != 'N/A')
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    resolutionInfo.quality,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              // 速度标签
-                              if (resolutionInfo.loadSpeed != 'N/A')
+                              if (source.note != null)
                                 Text(
-                                  resolutionInfo.loadSpeed,
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
+                                  source.note!,
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
-                              // 延迟标签
-                              const SizedBox(width: 8),
-                              Text(
-                                '${resolutionInfo.pingTime}ms',
-                                style: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 12,
+                              if (resolutionInfo != null)
+                                Row(
+                                  children: [
+                                    if (resolutionInfo.quality != 'N/A')
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.withOpacity(0.8),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          resolutionInfo.quality,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (resolutionInfo.loadSpeed != 'N/A')
+                                      Text(
+                                        resolutionInfo.loadSpeed,
+                                        style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${resolutionInfo.pingTime}ms',
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else if (_resolutionDetectionInProgress)
+                                Text(
+                                  '检测中...',
+                                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
                                 ),
-                              ),
                             ],
                           ),
-                      ],
+                          trailing: isSelected
+                              ? const Icon(Icons.check, color: Colors.orange)
+                              : null,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _switchVideoSource(index);
+                          },
+                        );
+                      },
                     ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check, color: Colors.orange)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _switchVideoSource(index);
-                    },
-                  );
-                },
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1335,136 +1319,5 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
     // 可以选择继续本地播放
     // _playerController.play();
-  }
-
-  /// 检测所有视频源的分辨率信息
-  Future<void> _detectVideoResolutions() async {
-    print('=== 开始检测视频源分辨率 ===');
-    print('视频源数量: ${_videoSources?.length ?? 0}');
-
-    if (_videoSources == null || _videoSources!.isEmpty) {
-      print('视频源为空，跳过检测');
-      return;
-    }
-
-    try {
-      // 收集所有有效的视频源并获取实际播放地址
-      final List<String> urls = [];
-      final List<int> indices = [];
-      final List<Future<String?>> detailFutures = [];
-
-      for (int i = 0; i < _videoSources!.length; i++) {
-        final source = _videoSources![i];
-        print('检查视频源 $i: id=${source.id}');
-
-        if (source.source != null &&
-            source.source!.isNotEmpty &&
-            source.id.isNotEmpty) {
-          // 获取视频详情以获取实际播放地址
-          detailFutures
-              .add(_getVideoDetailForResolution(source.source!, source.id, i));
-          indices.add(i);
-        } else {
-          print('跳过无效视频源: index=$i, id=${source.id}');
-        }
-      }
-
-      if (detailFutures.isEmpty) {
-        print('没有有效的视频源，跳过检测');
-        return;
-      }
-
-      print('等待所有视频详情获取完成，任务数量: ${detailFutures.length}');
-      final results = await Future.wait(detailFutures);
-      print('所有视频详情获取完成');
-
-      // 收集有效的播放地址
-      for (int i = 0; i < results.length; i++) {
-        final url = results[i];
-        if (url != null && url.isNotEmpty) {
-          urls.add(url);
-          print('获取到源的视频URL: index=${indices[i]}, url=$url');
-        } else {
-          print('源没有返回有效的视频URL: index=${indices[i]}');
-        }
-      }
-
-      if (urls.isEmpty) {
-        print('没有获取到任何有效的视频URL，跳过检测');
-        return;
-      }
-
-      // 批量获取分辨率信息
-      print('开始批量获取分辨率信息，URL数量: ${urls.length}');
-      print('URL列表: $urls');
-
-      final resolutionMap =
-          await VideoResolutionDetector.getVideoResolutionsFromM3u8List(urls);
-      print('分辨率信息获取完成，结果数量: ${resolutionMap.length}');
-      print('分辨率映射: $resolutionMap');
-
-      // 更新分辨率信息映射
-      int urlIndex = 0;
-      for (int i = 0; i < results.length; i++) {
-        final url = results[i];
-        if (url != null && url.isNotEmpty) {
-          final index = indices[i];
-          print('处理结果: index=$index, url=$url');
-
-          if (resolutionMap.containsKey(url)) {
-            print(
-                '设置分辨率信息: index=$index, url=$url, info=${resolutionMap[url]}');
-            setState(() {
-              _resolutionInfoMap[index] = resolutionMap[url]!;
-            });
-          } else {
-            print('未找到URL的分辨率信息: $url');
-          }
-          urlIndex++;
-        }
-      }
-
-      print('=== 视频源分辨率检测完成 ===');
-    } catch (e, stackTrace) {
-      print('检测视频分辨率时出错: $e');
-      print('错误堆栈: $stackTrace');
-    }
-  }
-
-  /// 获取视频详情用于分辨率检测
-  Future<String?> _getVideoDetailForResolution(
-      String source, String id, int index) async {
-    try {
-      print('获取视频详情用于分辨率检测: source=$source, index=$index');
-
-      final prefs = await SharedPreferences.getInstance();
-      final serverUrl = prefs.getString('api_server_address');
-
-      if (serverUrl == null) {
-        print('服务器地址为空');
-        return null;
-      }
-
-      print('使用服务器地址: $serverUrl');
-      final apiClient = ApiClient(baseUrl: serverUrl);
-      final dataSource = MovieRemoteDataSourceImpl(apiClient);
-
-      print('开始获取视频详情: source=$source');
-      final videoDetail = await dataSource.getVideoDetail(source, id);
-      print(
-          '获取到视频详情: source=$source, episodes数量=${videoDetail.episodes?.length ?? 0}');
-
-      if (videoDetail.episodes != null && videoDetail.episodes!.isNotEmpty) {
-        final firstEpisodeUrl = videoDetail.episodes!.first;
-        print('第一集URL: $firstEpisodeUrl');
-        return firstEpisodeUrl;
-      } else {
-        print('没有剧集信息');
-        return null;
-      }
-    } catch (e) {
-      print('获取视频详情失败: source=$source, 错误: $e');
-      return null;
-    }
   }
 }

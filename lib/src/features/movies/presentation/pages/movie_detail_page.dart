@@ -34,7 +34,7 @@ import 'dart:async';
 import 'package:mtv_app/src/core/services/cast_service.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
 import 'package:mtv_app/src/features/movies/presentation/pages/cast_control_page.dart';
-
+import 'package:mtv_app/src/core/utils/video_source_helper.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 // 定义一个回调函数类型，用于通知收藏状态变化
@@ -75,32 +75,41 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   bool _isCasting = false;
 
   // 添加分辨率信息相关的字段
-  final Map<String, VideoResolutionInfo> _resolutionInfoMap =
+  Map<String, VideoResolutionInfo> _resolutionInfoMap =
       {}; // 存储每个视频源的分辨率信息
-  String? _highestQuality; // 存储所有播放源中的最高分辨率
   bool _resolutionDetectionInProgress = false;
   final _resolutionUpdateController = StreamController<void>.broadcast();
+  VideoSourceHelper? _videoSourceHelper;
 
   @override
   void initState() {
     super.initState();
-    print('MovieDetailPage initState 开始');
-    // 如果有传入的视频源数据，直接使用
+    _videoSourceHelper = VideoSourceHelper(
+      onUpdate: (resolutionMap, sortedSources) {
+        if (!mounted) return;
+        setState(() {
+          _resolutionInfoMap = resolutionMap;
+          _videoSources = sortedSources;
+        });
+        _resolutionUpdateController.add(null);
+      },
+      onLoadingStateChanged: (isLoading) {
+        if (!mounted) return;
+        setState(() {
+          _resolutionDetectionInProgress = isLoading;
+        });
+        _resolutionUpdateController.add(null);
+      },
+    );
+
     if (widget.videoSources != null && widget.videoSources!.isNotEmpty) {
-      print('使用传入的视频源数据，数量: ${widget.videoSources!.length}');
       _videoSources = widget.videoSources!;
       _selectedVideo = _videoSources[widget.selectedSourceIndex ?? 0];
       _dataLoaded = true;
-      // 添加分辨率检测
-      print('Init中有传入视频源，准备添加PostFrameCallback调用分辨率检测');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        print('Init PostFrameCallback执行: 调用 _detectVideoResolutions');
-        _detectVideoResolutions();
+        _videoSourceHelper?.detectAndSortSources(_videoSources);
       });
-    } else {
-      print('没有传入视频源数据');
     }
-    print('MovieDetailPage initState 结束');
     _initializeBloc();
   }
 
@@ -252,7 +261,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
             BlocListener<MovieBloc, MovieState>(
               listener: (context, state) {
-                print('MovieBloc状态变化: $state');
                 _handleMovieState(state);
               },
             ),
@@ -281,8 +289,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
                   // 添加分辨率检测
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    print('BlocBuilder中的VideosLoaded状态触发分辨率检测');
-                    _detectVideoResolutions();
+                    _videoSourceHelper?.detectAndSortSources(_videoSources);
                   });
 
                   // Check favorite status after video sources are loaded
@@ -319,7 +326,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void _handleMovieState(MovieState state) {
     if (state is VideoSourcesLoaded) {
       setState(() {
-        print('处理 VideoSourcesLoaded 状态，sources 数量: ${state.sources.length}');
         // 从sources数据创建Video对象列表
         _videoSources = state.sources.map((sourceMap) {
           return Video(
@@ -335,7 +341,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           );
         }).toList();
 
-        print('创建的 Video 对象数量: ${_videoSources.length}');
         if (_videoSources.isNotEmpty) {
           _selectedVideo = _videoSources[0];
         }
@@ -343,10 +348,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       });
 
       // 添加分辨率检测
-      print('API加载完成，准备添加PostFrameCallback调用分辨率检测');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        print('API加载PostFrameCallback执行: 调用 _detectVideoResolutions');
-        _detectVideoResolutions();
+        _videoSourceHelper?.detectAndSortSources(_videoSources);
       });
     } else if (state is MovieError) {
       if (mounted) {
@@ -779,10 +782,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                           // 获取该源的分辨率信息，使用源ID作为键
                           final resolutionInfo = _resolutionInfoMap[source.id];
 
-                          print(
-                              '显示播放源: index=$index, source=${source.source}, sourceId=${source.id}, resolutionInfo=$resolutionInfo');
-                          print('当前_resolutionInfoMap内容: $_resolutionInfoMap');
-
                           return Card(
                             color: isSelected
                                 ? Colors.orange.withAlpha(70)
@@ -965,181 +964,12 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             videoId: source.id,
             title: source.title ?? widget.title ?? '未知标题',
             videoSources: _videoSources,
-            selectedSourceIndex: index,
+            selectedSourceIndex: _videoSources.indexOf(source),
+            resolutionInfoMap: _resolutionInfoMap,
           ),
         ),
       ),
     );
-  }
-
-  /// 检测所有视频源的分辨率信息（流式更新）
-  Future<void> _detectVideoResolutions() async {
-    print('=== 开始检测视频源分辨率 (流式) ===');
-    if (_videoSources.isEmpty) {
-      print('视频源为空，跳过检测');
-      return;
-    }
-
-    setState(() {
-      _resolutionDetectionInProgress = true;
-      _resolutionInfoMap.clear(); // 清空旧数据
-      _highestQuality = null;
-    });
-    _resolutionUpdateController.add(null);
-
-    try {
-      // 1. 获取所有源的播放URL
-      final Map<String, String> sourceUrls = {}; // sourceId -> m3u8Url
-      final detailFutures = _videoSources.map((source) {
-        return _getVideoDetailForResolution(
-                source.source!, source.id, _videoSources.indexOf(source))
-            .then((url) {
-          if (url != null) {
-            sourceUrls[source.id] = url;
-          }
-        });
-      });
-      await Future.wait(detailFutures);
-      print('所有视频详情获取完成，有效URL数量: ${sourceUrls.length}');
-
-      if (sourceUrls.isEmpty) {
-        setState(() => _resolutionDetectionInProgress = false);
-        _resolutionUpdateController.add(null);
-        return;
-      }
-
-      // 2. 并行监听所有源的流式检测
-      final detectionCompleters = <Completer<void>>[];
-      sourceUrls.forEach((sourceId, url) {
-        final completer = Completer<void>();
-        detectionCompleters.add(completer);
-
-        VideoResolutionDetector.streamVideoResolutionInfo(url).listen(
-          (info) {
-            if (!mounted) return;
-            setState(() {
-              _resolutionInfoMap[sourceId] = info;
-              // 更新最高画质
-              final quality = info.quality;
-              if (quality != 'N/A' && quality != '错误') {
-                final currentRank = _getQualityRank(_highestQuality ?? 'N/A');
-                final newRank = _getQualityRank(quality);
-                if (newRank > currentRank) {
-                  _highestQuality = quality;
-                }
-              }
-            });
-            _resolutionUpdateController.add(null); // 通知UI刷新
-          },
-          onError: (e) {
-            if (!mounted) return;
-            setState(() {
-              _resolutionInfoMap[sourceId] = VideoResolutionInfo(
-                  quality: '错误', loadSpeed: 'N/A', pingTime: 9999);
-            });
-            _resolutionUpdateController.add(null);
-            if (!completer.isCompleted) completer.complete();
-          },
-          onDone: () {
-            if (!completer.isCompleted) completer.complete();
-          },
-        );
-      });
-
-      // 等待所有检测流完成
-      await Future.wait(detectionCompleters.map((c) => c.future));
-
-      // 3. 所有信息获取完毕后，进行最终排序
-      if (mounted) {
-        setState(() {
-          _videoSources.sort(_compareSources);
-        });
-        _resolutionUpdateController.add(null);
-        print('=== 视频源已根据分辨率和速度排序 ===');
-      }
-    } catch (e, stackTrace) {
-      print('检测视频分辨率时出错: $e');
-      print('错误堆栈: $stackTrace');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _resolutionDetectionInProgress = false;
-        });
-        _resolutionUpdateController.add(null);
-        print('=== 视频源分辨率检测完成 (流式) ===');
-      }
-    }
-  }
-
-  /// 获取视频详情并提取第一集URL用于分辨率检测
-  Future<String?> _getVideoDetailForResolution(
-      String source, String id, int index) async {
-    print('获取视频详情用于分辨率检测: source=$source, id=$id, index=$index');
-    try {
-      // 创建临时的MovieBloc用于获取视频详情
-      final prefs = await SharedPreferences.getInstance();
-      final serverAddress = prefs.getString('api_server_address');
-
-      if (serverAddress == null) {
-        print('服务器地址为空');
-        return null;
-      }
-
-      print('使用服务器地址: $serverAddress');
-      final apiClient = ApiClient(baseUrl: serverAddress);
-      final repository = MovieRepositoryImpl(
-        remoteDataSource: MovieRemoteDataSourceImpl(apiClient),
-      );
-
-      print('开始获取视频详情: source=$source, id=$id');
-      // 添加更多的错误处理和调试信息
-      try {
-        final videoDetail = await repository.getVideoDetail(source, id);
-        print(
-            '获取到视频详情: source=$source, id=$id, episodes数量=${videoDetail.episodes?.length ?? 0}');
-
-        // 打印详细的剧集信息
-        if (videoDetail.episodes != null) {
-          print('剧集列表:');
-          for (int i = 0; i < videoDetail.episodes!.length; i++) {
-            print('  第${i + 1}集: ${videoDetail.episodes![i]}');
-          }
-        }
-
-        // 返回第一集URL用于分辨率检测
-        if (videoDetail.episodes != null && videoDetail.episodes!.isNotEmpty) {
-          final firstEpisodeUrl = videoDetail.episodes!.first;
-          print('源$index的第一集URL: $firstEpisodeUrl');
-          return firstEpisodeUrl;
-        } else {
-          print('源$index没有剧集信息');
-          return null;
-        }
-      } catch (e, stackTrace) {
-        print('获取视频详情时发生错误: $e');
-        print('错误堆栈: $stackTrace');
-        // 尝试使用不同的参数格式
-        try {
-          print('尝试使用不同的参数格式...');
-          final videoDetail = await repository.getVideoDetail(source, id);
-          print(
-              '使用不同参数格式获取到视频详情: source=$source, id=$id, episodes数量=${videoDetail.episodes?.length ?? 0}');
-          if (videoDetail.episodes != null &&
-              videoDetail.episodes!.isNotEmpty) {
-            final firstEpisodeUrl = videoDetail.episodes!.first;
-            print('源$index的第一集URL: $firstEpisodeUrl');
-            return firstEpisodeUrl;
-          }
-        } catch (e2) {
-          print('使用不同参数格式也失败了: $e2');
-        }
-        return null;
-      }
-    } catch (e, stackTrace) {
-      print('获取视频详情失败: source=$source, id=$id, 错误: $e');
-      print('错误堆栈: $stackTrace');
-      return null;
-    }
   }
 
   /// 根据分辨率标签获取等级（数字越大质量越高）
@@ -1160,58 +990,20 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     }
   }
 
-  /// 解析速度字符串，返回以KB/s为单位的数值用于比较
-  double _parseSpeed(String? speedString) {
-    if (speedString == null ||
-        speedString == 'N/A' ||
-        speedString.contains('测速中') ||
-        speedString.contains('错误')) {
-      return 0.0;
+  String? get _highestQuality {
+    if (_resolutionInfoMap.isEmpty) {
+      return null;
     }
-    try {
-      final parts = speedString.split(' ');
-      if (parts.length != 2) return 0.0;
-
-      final value = double.tryParse(parts[0]) ?? 0.0;
-      final unit = parts[1].toUpperCase();
-
-      if (unit == 'MB/S') {
-        return value * 1024;
-      } else if (unit == 'KB/S') {
-        return value;
+    String? highest;
+    int highestRank = -1;
+    for (var info in _resolutionInfoMap.values) {
+      final rank = _getQualityRank(info.quality);
+      if (rank > highestRank) {
+        highestRank = rank;
+        highest = info.quality;
       }
-      return 0.0;
-    } catch (e) {
-      return 0.0;
     }
-  }
-
-  /// 播放源排序比较函数
-  int _compareSources(Video a, Video b) {
-    final infoA = _resolutionInfoMap[a.id];
-    final infoB = _resolutionInfoMap[b.id];
-
-    // 处理信息不全的情况，确保有信息的排在前面
-    if (infoA == null && infoB == null) return 0;
-    if (infoA == null) return 1;
-    if (infoB == null) return -1;
-
-    // 1. 按分辨率排序 (降序)
-    final qualityRankA = _getQualityRank(infoA.quality);
-    final qualityRankB = _getQualityRank(infoB.quality);
-    if (qualityRankA != qualityRankB) {
-      return qualityRankB.compareTo(qualityRankA);
-    }
-
-    // 2. 按速度排序 (降序)
-    final speedA = _parseSpeed(infoA.loadSpeed);
-    final speedB = _parseSpeed(infoB.loadSpeed);
-    if (speedA != speedB) {
-      return speedB.compareTo(speedA);
-    }
-
-    // 3. 按延迟排序 (升序)
-    return infoA.pingTime.compareTo(infoB.pingTime);
+    return highest;
   }
 
   Future<void> _showDevicePicker() async {
