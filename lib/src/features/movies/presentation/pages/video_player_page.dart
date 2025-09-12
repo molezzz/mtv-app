@@ -17,6 +17,7 @@ import 'package:mtv_app/src/features/movies/data/models/play_record_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_source.dart';
+import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoSource;
@@ -73,11 +74,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Timer? _playRecordTimer; // 定时保存播放记录
   bool _hasSeekedToInitialPosition = false; // 是否已经跳转到初始位置
 
+  // 添加分辨率信息映射
+  Map<int, VideoResolutionInfo> _resolutionInfoMap = {};
+
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
   @override
   void initState() {
     super.initState();
+    print('VideoPlayerPage initState 开始');
     _videoSources = widget.videoSources;
     _currentSourceIndex = widget.selectedSourceIndex ?? 0;
     _initializeVideoPlayer();
@@ -85,6 +90,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     WakelockPlus.enable(); // 保持屏幕常亮
     _checkCastingStatus();
     _initializeDataSource(); // 初始化数据源
+    print('调用 _detectVideoResolutions');
+    _detectVideoResolutions(); // 添加这一行，检测视频源分辨率
+    print('VideoPlayerPage initState 结束');
   }
 
   @override
@@ -586,10 +594,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 itemBuilder: (context, index) {
                   final source = _videoSources![index];
                   final isSelected = index == _currentSourceIndex;
+                  // 获取该源的分辨率信息
+                  final resolutionInfo = _resolutionInfoMap[index];
+
+                  print(
+                      '显示播放源: index=$index, source=${source.source}, resolutionInfo=$resolutionInfo');
+
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor:
-                          isSelected ? Colors.orange : Colors.grey[600],
+                          isSelected ? Colors.orange : Colors.grey[600]!,
                       child: Text(
                         '${index + 1}',
                         style: const TextStyle(color: Colors.white),
@@ -603,12 +617,59 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
-                    subtitle: source.note != null
-                        ? Text(
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (source.note != null)
+                          Text(
                             source.note!,
                             style: const TextStyle(color: Colors.grey),
-                          )
-                        : null,
+                          ),
+                        // 显示分辨率和速度信息
+                        if (resolutionInfo != null)
+                          Row(
+                            children: [
+                              // 分辨率标签
+                              if (resolutionInfo.quality != 'N/A')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withOpacity(0.8),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    resolutionInfo.quality,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              // 速度标签
+                              if (resolutionInfo.loadSpeed != 'N/A')
+                                Text(
+                                  '${resolutionInfo.loadSpeed}',
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              // 延迟标签
+                              const SizedBox(width: 8),
+                              Text(
+                                '${resolutionInfo.pingTime}ms',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                     trailing: isSelected
                         ? const Icon(Icons.check, color: Colors.orange)
                         : null,
@@ -1274,5 +1335,130 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
     // 可以选择继续本地播放
     // _playerController.play();
+  }
+
+  /// 检测所有视频源的分辨率信息
+  Future<void> _detectVideoResolutions() async {
+    print('=== 开始检测视频源分辨率 ===');
+    print('视频源数量: ${_videoSources?.length ?? 0}');
+
+    if (_videoSources == null || _videoSources!.isEmpty) {
+      print('视频源为空，跳过检测');
+      return;
+    }
+
+    try {
+      // 收集所有有效的视频源并获取实际播放地址
+      final List<String> urls = [];
+      final List<int> indices = [];
+      final List<Future<String?>> detailFutures = [];
+
+      for (int i = 0; i < _videoSources!.length; i++) {
+        final source = _videoSources![i];
+        print('检查视频源 $i: id=${source.id}');
+
+        if (source.source != null && source.source!.isNotEmpty && source.id.isNotEmpty) {
+          // 获取视频详情以获取实际播放地址
+          detailFutures.add(_getVideoDetailForResolution(source.source!, source.id, i));
+          indices.add(i);
+        } else {
+          print('跳过无效视频源: index=$i, id=${source.id}');
+        }
+      }
+
+      if (detailFutures.isEmpty) {
+        print('没有有效的视频源，跳过检测');
+        return;
+      }
+
+      print('等待所有视频详情获取完成，任务数量: ${detailFutures.length}');
+      final results = await Future.wait(detailFutures);
+      print('所有视频详情获取完成');
+
+      // 收集有效的播放地址
+      for (int i = 0; i < results.length; i++) {
+        final url = results[i];
+        if (url != null && url.isNotEmpty) {
+          urls.add(url);
+          print('获取到源的视频URL: index=${indices[i]}, url=$url');
+        } else {
+          print('源没有返回有效的视频URL: index=${indices[i]}');
+        }
+      }
+
+      if (urls.isEmpty) {
+        print('没有获取到任何有效的视频URL，跳过检测');
+        return;
+      }
+
+      // 批量获取分辨率信息
+      print('开始批量获取分辨率信息，URL数量: ${urls.length}');
+      print('URL列表: $urls');
+
+      final resolutionMap =
+          await VideoResolutionDetector.getVideoResolutionsFromM3u8List(urls);
+      print('分辨率信息获取完成，结果数量: ${resolutionMap.length}');
+      print('分辨率映射: $resolutionMap');
+
+      // 更新分辨率信息映射
+      int urlIndex = 0;
+      for (int i = 0; i < results.length; i++) {
+        final url = results[i];
+        if (url != null && url.isNotEmpty) {
+          final index = indices[i];
+          print('处理结果: index=$index, url=$url');
+
+          if (resolutionMap.containsKey(url)) {
+            print('设置分辨率信息: index=$index, url=$url, info=${resolutionMap[url]}');
+            setState(() {
+              _resolutionInfoMap[index] = resolutionMap[url]!;
+            });
+          } else {
+            print('未找到URL的分辨率信息: $url');
+          }
+          urlIndex++;
+        }
+      }
+
+      print('=== 视频源分辨率检测完成 ===');
+    } catch (e, stackTrace) {
+      print('检测视频分辨率时出错: $e');
+      print('错误堆栈: $stackTrace');
+    }
+  }
+
+  /// 获取视频详情用于分辨率检测
+  Future<String?> _getVideoDetailForResolution(String source, String id, int index) async {
+    try {
+      print('获取视频详情用于分辨率检测: source=$source, index=$index');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString('api_server_address');
+      
+      if (serverUrl == null) {
+        print('服务器地址为空');
+        return null;
+      }
+
+      print('使用服务器地址: $serverUrl');
+      final apiClient = ApiClient(baseUrl: serverUrl);
+      final dataSource = MovieRemoteDataSourceImpl(apiClient);
+
+      print('开始获取视频详情: source=$source');
+      final videoDetail = await dataSource.getVideoDetail(source, id);
+      print('获取到视频详情: source=$source, episodes数量=${videoDetail.episodes?.length ?? 0}');
+
+      if (videoDetail.episodes != null && videoDetail.episodes!.isNotEmpty) {
+        final firstEpisodeUrl = videoDetail.episodes!.first;
+        print('第一集URL: $firstEpisodeUrl');
+        return firstEpisodeUrl;
+      } else {
+        print('没有剧集信息');
+        return null;
+      }
+    } catch (e) {
+      print('获取视频详情失败: source=$source, 错误: $e');
+      return null;
+    }
   }
 }

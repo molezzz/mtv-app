@@ -33,18 +33,18 @@ class VideoDetail extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    title,
-    poster,
-    source,
-    sourceName,
-    desc,
-    type,
-    year,
-    area,
-    director,
-    actor,
-    remarks,
-    episodes,
-  ];
+        id,
+        title,
+        poster,
+        source,
+        sourceName,
+        desc,
+        type,
+        year,
+        area,
+        director,
+        actor,
+        remarks,
+        episodes,
+      ];
 }

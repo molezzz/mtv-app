@@ -10,6 +10,7 @@ class Video extends Equatable {
   final String? type; // 类型
   final String? source; // 视频源
   final String? sourceName; // 视频源名称
+  final String? quality; // 分辨率标签，如 "4K", "1080p", "720p" 等
 
   const Video({
     required this.id,
@@ -21,8 +22,20 @@ class Video extends Equatable {
     this.type,
     this.source,
     this.sourceName,
+    this.quality,
   });
 
   @override
-  List<Object?> get props => [id, title, description, pic, year, note, type, source, sourceName];
+  List<Object?> get props => [
+        id,
+        title,
+        description,
+        pic,
+        year,
+        note,
+        type,
+        source,
+        sourceName,
+        quality
+      ];
 }
