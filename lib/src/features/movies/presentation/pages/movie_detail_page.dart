@@ -79,6 +79,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       {}; // 存储每个视频源的分辨率信息
   String? _highestQuality; // 存储所有播放源中的最高分辨率
   bool _resolutionDetectionInProgress = false;
+  final _resolutionUpdateController = StreamController<void>.broadcast();
 
   @override
   void initState() {
@@ -177,6 +178,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void dispose() {
     _movieBloc?.close();
     _favoriteBloc?.close(); // 关闭详情页专用的FavoriteBloc实例
+    _resolutionUpdateController.close();
     super.dispose();
   }
 
@@ -720,221 +722,235 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(
-                  Icons.play_circle_outline,
-                  color: Colors.orange,
-                  size: 24,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  '选择播放源',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // 显示最高分辨率
-            if (_highestQuality != null && _highestQuality != 'N/A')
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '最高画质: $_highestQuality',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            Expanded(
-              child: ListView.builder(
-                key: const PageStorageKey('episode_list'),
-                itemCount: _videoSources.length,
-                itemBuilder: (context, index) {
-                  final source = _videoSources[index];
-                  final isSelected = source.id == _selectedVideo?.id;
-                  // 获取该源的分辨率信息，使用源ID作为键
-                  final resolutionInfo = _resolutionInfoMap[source.id];
-
-                  print(
-                      '显示播放源: index=$index, source=${source.source}, sourceId=${source.id}, resolutionInfo=$resolutionInfo');
-                  print('当前_resolutionInfoMap内容: $_resolutionInfoMap');
-
-                  return Card(
-                    color: isSelected
-                        ? Colors.orange.withValues(alpha: 0.3)
-                        : Colors.grey[800],
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            isSelected ? Colors.orange : Colors.grey[600],
+      builder: (context) {
+        return StreamBuilder<void>(
+            stream: _resolutionUpdateController.stream,
+            builder: (context, snapshot) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.play_circle_outline,
+                          color: Colors.orange,
+                          size: 24,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          '选择播放源',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // 显示最高分辨率
+                    if (_highestQuality != null && _highestQuality != 'N/A')
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Text(
-                          '${index + 1}',
+                          '最高画质: $_highestQuality',
                           style: const TextStyle(
                             color: Colors.white,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      title: Text(
-                        source.sourceName ?? source.source ?? '未知源${index + 1}',
-                        style: TextStyle(
-                          color: isSelected ? Colors.orange : Colors.white,
-                          fontSize: 16,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
+                    Expanded(
+                      child: ListView.builder(
+                        key: const PageStorageKey('episode_list'),
+                        itemCount: _videoSources.length,
+                        itemBuilder: (context, index) {
+                          final source = _videoSources[index];
+                          final isSelected = source.id == _selectedVideo?.id;
+                          // 获取该源的分辨率信息，使用源ID作为键
+                          final resolutionInfo = _resolutionInfoMap[source.id];
+
+                          print(
+                              '显示播放源: index=$index, source=${source.source}, sourceId=${source.id}, resolutionInfo=$resolutionInfo');
+                          print('当前_resolutionInfoMap内容: $_resolutionInfoMap');
+
+                          return Card(
+                            color: isSelected
+                                ? Colors.orange.withValues(alpha: 0.3)
+                                : Colors.grey[800],
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: isSelected
+                                    ? Colors.orange
+                                    : Colors.grey[600],
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                source.sourceName ??
+                                    source.source ??
+                                    '未知源${index + 1}',
+                                style: TextStyle(
+                                  color:
+                                      isSelected ? Colors.orange : Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (source.note != null &&
+                                      source.note!.isNotEmpty)
+                                    Text(
+                                      '分类: ${source.note!}',
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 14,
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      '播放源 ${index + 1}',
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  // 显示分辨率信息
+                                  if (resolutionInfo != null &&
+                                      resolutionInfo.quality != 'N/A')
+                                    Row(
+                                      children: [
+                                        // 分辨率标签
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          margin: const EdgeInsets.only(
+                                              top: 4, right: 8),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.orange.withOpacity(0.8),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            resolutionInfo.quality,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        // 速度标签
+                                        if (resolutionInfo.loadSpeed != 'N/A')
+                                          Text(
+                                            resolutionInfo.loadSpeed,
+                                            style: TextStyle(
+                                              color: Colors.grey[400],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        // 延迟标签
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${resolutionInfo.pingTime}ms',
+                                          style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    // 显示检测中或未知状态
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[600],
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          _resolutionDetectionInProgress
+                                              ? '检测分辨率中...'
+                                              : '未知',
+                                          style: TextStyle(
+                                            color: Colors.grey[300],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked
+                                    : Icons.play_arrow,
+                                color: Colors.orange,
+                              ),
+                              onTap: () {
+                                // 首先切换选中的播放源
+                                setState(() {
+                                  _selectedVideo = source;
+                                });
+                                Navigator.pop(context);
+
+                                // 检查新选中视频的收藏状态
+                                final key =
+                                    '${source.source ?? 'unknown'}+${source.id}';
+                                _favoriteBloc?.add(
+                                    favorite_event.CheckFavoriteStatus(key));
+
+                                // 弹出播放或投屏的选择对话框
+                                _showPlayOrCastDialog(source, index);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          '取消',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (source.note != null && source.note!.isNotEmpty)
-                            Text(
-                              '分类: ${source.note!}',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 14,
-                              ),
-                            )
-                          else
-                            Text(
-                              '播放源 ${index + 1}',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 14,
-                              ),
-                            ),
-                          // 显示分辨率信息
-                          if (resolutionInfo != null &&
-                              resolutionInfo.quality != 'N/A')
-                            Row(
-                              children: [
-                                // 分辨率标签
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  margin:
-                                      const EdgeInsets.only(top: 4, right: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.8),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    resolutionInfo.quality,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                // 速度标签
-                                if (resolutionInfo.loadSpeed != 'N/A')
-                                  Text(
-                                    resolutionInfo.loadSpeed,
-                                    style: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                // 延迟标签
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${resolutionInfo.pingTime}ms',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            // 显示检测中或未知状态
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[600],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  _resolutionDetectionInProgress
-                                      ? '检测分辨率中...'
-                                      : '未知',
-                                  style: TextStyle(
-                                    color: Colors.grey[300],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.play_arrow,
-                        color: Colors.orange,
-                      ),
-                      onTap: () {
-                        // 首先切换选中的播放源
-                        setState(() {
-                          _selectedVideo = source;
-                        });
-                        Navigator.pop(context);
-
-                        // 检查新选中视频的收藏状态
-                        final key =
-                            '${source.source ?? 'unknown'}+${source.id}';
-                        _favoriteBloc
-                            ?.add(favorite_event.CheckFavoriteStatus(key));
-
-                        // 弹出播放或投屏的选择对话框
-                        _showPlayOrCastDialog(source, index);
-                      },
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  '取消',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 16,
-                  ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
+              );
+            });
+      },
     );
   }
 
@@ -969,6 +985,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     setState(() {
       _resolutionDetectionInProgress = true;
     });
+    _resolutionUpdateController.add(null);
 
     try {
       // 为每个视频源获取详细信息并提取第一集URL进行分辨率检测
@@ -1013,6 +1030,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
       if (sourceUrls.isEmpty) {
         print('没有获取到任何有效的视频URL，跳过检测');
+        setState(() {
+          _resolutionDetectionInProgress = false;
+        });
+        _resolutionUpdateController.add(null);
         return;
       }
 
@@ -1079,6 +1100,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             print('没有检测到有效的最高分辨率');
           }
         });
+        _resolutionUpdateController.add(null);
       }
 
       print('=== 视频源分辨率检测完成 ===');
@@ -1089,6 +1111,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       setState(() {
         _resolutionDetectionInProgress = false;
       });
+      _resolutionUpdateController.add(null);
     }
   }
 
