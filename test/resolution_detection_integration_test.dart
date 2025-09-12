@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtv_app/src/features/movies/domain/entities/video.dart';
-import 'package:mtv_app/src/features/movies/data/models/video_detail_model.dart';
 import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
 
 void main() {

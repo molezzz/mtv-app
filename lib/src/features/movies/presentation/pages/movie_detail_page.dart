@@ -785,7 +785,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
                           return Card(
                             color: isSelected
-                                ? Colors.orange.withValues(alpha: 0.3)
+                                ? Colors.orange.withAlpha(70)
                                 : Colors.grey[800],
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
@@ -835,31 +835,31 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                       ),
                                     ),
                                   // 显示分辨率信息
-                                  if (resolutionInfo != null &&
-                                      resolutionInfo.quality != 'N/A')
+                                  if (resolutionInfo != null)
                                     Row(
                                       children: [
                                         // 分辨率标签
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          margin: const EdgeInsets.only(
-                                              top: 4, right: 8),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.orange.withOpacity(0.8),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            resolutionInfo.quality,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
+                                        if (resolutionInfo.quality != 'N/A')
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            margin: const EdgeInsets.only(
+                                                top: 4, right: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange
+                                                  .withOpacity(0.8),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              resolutionInfo.quality,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
-                                        ),
                                         // 速度标签
                                         if (resolutionInfo.loadSpeed != 'N/A')
                                           Text(
@@ -894,7 +894,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                         ),
                                         child: Text(
                                           _resolutionDetectionInProgress
-                                              ? '检测分辨率中...'
+                                              ? '检测中...'
                                               : '未知',
                                           style: TextStyle(
                                             color: Colors.grey[300],
@@ -1048,6 +1048,15 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
       // 等待所有检测流完成
       await Future.wait(detectionCompleters.map((c) => c.future));
+
+      // 3. 所有信息获取完毕后，进行最终排序
+      if (mounted) {
+        setState(() {
+          _videoSources.sort(_compareSources);
+        });
+        _resolutionUpdateController.add(null);
+        print('=== 视频源已根据分辨率和速度排序 ===');
+      }
     } catch (e, stackTrace) {
       print('检测视频分辨率时出错: $e');
       print('错误堆栈: $stackTrace');
@@ -1149,6 +1158,60 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       default:
         return 0;
     }
+  }
+
+  /// 解析速度字符串，返回以KB/s为单位的数值用于比较
+  double _parseSpeed(String? speedString) {
+    if (speedString == null ||
+        speedString == 'N/A' ||
+        speedString.contains('测速中') ||
+        speedString.contains('错误')) {
+      return 0.0;
+    }
+    try {
+      final parts = speedString.split(' ');
+      if (parts.length != 2) return 0.0;
+
+      final value = double.tryParse(parts[0]) ?? 0.0;
+      final unit = parts[1].toUpperCase();
+
+      if (unit == 'MB/S') {
+        return value * 1024;
+      } else if (unit == 'KB/S') {
+        return value;
+      }
+      return 0.0;
+    } catch (e) {
+      return 0.0;
+    }
+  }
+
+  /// 播放源排序比较函数
+  int _compareSources(Video a, Video b) {
+    final infoA = _resolutionInfoMap[a.id];
+    final infoB = _resolutionInfoMap[b.id];
+
+    // 处理信息不全的情况，确保有信息的排在前面
+    if (infoA == null && infoB == null) return 0;
+    if (infoA == null) return 1;
+    if (infoB == null) return -1;
+
+    // 1. 按分辨率排序 (降序)
+    final qualityRankA = _getQualityRank(infoA.quality);
+    final qualityRankB = _getQualityRank(infoB.quality);
+    if (qualityRankA != qualityRankB) {
+      return qualityRankB.compareTo(qualityRankA);
+    }
+
+    // 2. 按速度排序 (降序)
+    final speedA = _parseSpeed(infoA.loadSpeed);
+    final speedB = _parseSpeed(infoB.loadSpeed);
+    if (speedA != speedB) {
+      return speedB.compareTo(speedA);
+    }
+
+    // 3. 按延迟排序 (升序)
+    return infoA.pingTime.compareTo(infoB.pingTime);
   }
 
   Future<void> _showDevicePicker() async {

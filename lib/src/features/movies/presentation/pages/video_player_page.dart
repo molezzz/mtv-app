@@ -75,7 +75,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _hasSeekedToInitialPosition = false; // 是否已经跳转到初始位置
 
   // 添加分辨率信息映射
-  Map<int, VideoResolutionInfo> _resolutionInfoMap = {};
+  final Map<int, VideoResolutionInfo> _resolutionInfoMap = {};
 
   final List<double> _playbackSpeeds = [0.5, 1.0, 2.0];
 
@@ -651,7 +651,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               // 速度标签
                               if (resolutionInfo.loadSpeed != 'N/A')
                                 Text(
-                                  '${resolutionInfo.loadSpeed}',
+                                  resolutionInfo.loadSpeed,
                                   style: TextStyle(
                                     color: Colors.grey[400],
                                     fontSize: 12,
@@ -1357,9 +1357,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         final source = _videoSources![i];
         print('检查视频源 $i: id=${source.id}');
 
-        if (source.source != null && source.source!.isNotEmpty && source.id.isNotEmpty) {
+        if (source.source != null &&
+            source.source!.isNotEmpty &&
+            source.id.isNotEmpty) {
           // 获取视频详情以获取实际播放地址
-          detailFutures.add(_getVideoDetailForResolution(source.source!, source.id, i));
+          detailFutures
+              .add(_getVideoDetailForResolution(source.source!, source.id, i));
           indices.add(i);
         } else {
           print('跳过无效视频源: index=$i, id=${source.id}');
@@ -1409,7 +1412,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           print('处理结果: index=$index, url=$url');
 
           if (resolutionMap.containsKey(url)) {
-            print('设置分辨率信息: index=$index, url=$url, info=${resolutionMap[url]}');
+            print(
+                '设置分辨率信息: index=$index, url=$url, info=${resolutionMap[url]}');
             setState(() {
               _resolutionInfoMap[index] = resolutionMap[url]!;
             });
@@ -1428,13 +1432,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   /// 获取视频详情用于分辨率检测
-  Future<String?> _getVideoDetailForResolution(String source, String id, int index) async {
+  Future<String?> _getVideoDetailForResolution(
+      String source, String id, int index) async {
     try {
       print('获取视频详情用于分辨率检测: source=$source, index=$index');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final serverUrl = prefs.getString('api_server_address');
-      
+
       if (serverUrl == null) {
         print('服务器地址为空');
         return null;
@@ -1446,7 +1451,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
       print('开始获取视频详情: source=$source');
       final videoDetail = await dataSource.getVideoDetail(source, id);
-      print('获取到视频详情: source=$source, episodes数量=${videoDetail.episodes?.length ?? 0}');
+      print(
+          '获取到视频详情: source=$source, episodes数量=${videoDetail.episodes?.length ?? 0}');
 
       if (videoDetail.episodes != null && videoDetail.episodes!.isNotEmpty) {
         final firstEpisodeUrl = videoDetail.episodes!.first;

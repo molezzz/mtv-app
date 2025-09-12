@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
-import 'package:dio/dio.dart';
 
 void main() {
   group('Actual Video Sources', () {

@@ -4,7 +4,6 @@ import 'package:mtv_app/src/features/movies/data/repositories/movie_repository_i
 import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_source.dart';
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 
 void main() {
   group('Resolution Detection Debug Tests', () {

@@ -5,7 +5,6 @@ import 'package:mtv_app/src/features/movies/data/datasources/movie_remote_data_s
 import 'package:mtv_app/src/core/api/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
-import 'dart:io';
 
 void main() {
   group('Resolution Detection Auth Tests', () {
