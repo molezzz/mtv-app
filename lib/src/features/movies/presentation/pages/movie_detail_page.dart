@@ -31,6 +31,11 @@ import 'package:mtv_app/src/features/favorites/data/datasources/favorite_remote_
 import 'package:mtv_app/src/features/favorites/domain/entities/favorite.dart';
 import 'package:mtv_app/src/core/utils/video_resolution_detector.dart';
 import 'dart:async';
+import 'package:mtv_app/src/core/services/cast_service.dart';
+import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
+import 'package:mtv_app/src/features/movies/presentation/pages/cast_control_page.dart';
+
+import 'package:fluttertoast/fluttertoast.dart';
 
 // 定义一个回调函数类型，用于通知收藏状态变化
 typedef FavoriteStatusCallback = void Function(String key, bool isFavorite);
@@ -67,6 +72,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   Video? _selectedVideo;
   bool _dataLoaded = false; // 标记数据是否已加载
   bool _isFavorite = false; // 标记是否已收藏
+  bool _isCasting = false;
 
   // 添加分辨率信息相关的字段
   final Map<String, VideoResolutionInfo> _resolutionInfoMap =
@@ -399,6 +405,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     }
 
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -521,26 +528,24 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // 播放按钮
+                // 播放或投屏按钮
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       if (_videoSources.isNotEmpty) {
-                        _showEpisodeSelector(context);
+                        _showSourceSelector(context);
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('暂无播放源')),
                         );
                       }
                     },
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text(
-                      _videoSources.isNotEmpty
-                          ? '播放 (${_selectedVideo?.sourceName ?? _selectedVideo?.source ?? "未知来源"})'
-                          : '播放',
-                      style: const TextStyle(fontSize: 18),
+                    icon: const Icon(Icons.play_circle_fill),
+                    label: const Text(
+                      '播放 / 投屏',
+                      style: TextStyle(fontSize: 18),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
@@ -626,7 +631,40 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     );
   }
 
-  void _showEpisodeSelector(BuildContext context) {
+  void _showPlayOrCastDialog(Video source, int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text('请选择操作', style: TextStyle(color: Colors.white)),
+          content: Text('您想如何播放: ${source.sourceName ?? source.source ?? '未知源'}?',
+              style: TextStyle(color: Colors.grey[300])),
+          actionsAlignment: MainAxisAlignment.spaceEvenly,
+          actions: <Widget>[
+            TextButton(
+              child:
+                  const Text('投屏', style: TextStyle(color: Colors.orange, fontSize: 16)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                _showDevicePicker(); // This existing method uses _selectedVideo, which is already set
+              },
+            ),
+            TextButton(
+              child: const Text('直接播放',
+                  style: TextStyle(color: Colors.orange, fontSize: 16)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                _playVideo(source, index); // Call the existing play method
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSourceSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -824,7 +862,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         _favoriteBloc
                             ?.add(favorite_event.CheckFavoriteStatus(key));
 
-                        _playVideo(source, index);
+                        // 弹出播放或投屏的选择对话框
+                        _showPlayOrCastDialog(source, index);
                       },
                     ),
                   );
@@ -1092,5 +1131,96 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       default:
         return 0;
     }
+  }
+
+  Future<void> _showDevicePicker() async {
+    if (_selectedVideo == null) {
+      Fluttertoast.showToast(
+        msg: "请先选择一个播放源",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.TOP,
+        backgroundColor: Colors.orangeAccent,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
+
+    // Show a loading indicator while getting the video URL
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在获取投屏地址...')),
+    );
+
+    try {
+      final videoDetail = await _movieBloc!
+          .getVideoDetailForCasting(_selectedVideo!.source!, _selectedVideo!.id);
+
+      if (videoDetail.episodes == null || videoDetail.episodes!.isEmpty) {
+        // 修改这里：使用Fluttertoast显示错误信息在顶部
+        Fluttertoast.showToast(
+          msg: "获取视频播放地址失败",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        return;
+      }
+      final videoUrl = videoDetail.episodes!.first;
+
+      // Now show the device selector widget
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.grey[900],
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) => CastDeviceSelector(
+          videoUrl: videoUrl,
+          title: widget.title ?? '未知标题',
+          poster: _selectedVideo?.pic ?? widget.poster,
+          onDeviceConnected: (device) {
+            _onCastConnected(device, videoUrl);
+          },
+        ),
+      );
+    } catch (e) {
+      // 修改这里：使用Fluttertoast显示错误信息在顶部
+      Fluttertoast.showToast(
+        msg: "获取投屏地址失败: $e",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.TOP,
+        backgroundColor: Colors.redAccent,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
+  }
+
+  void _onCastConnected(CastDevice device, String videoUrl) {
+    // Navigate to the cast control page
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => CastControlPage(
+          videoUrl: videoUrl,
+          title: widget.title ?? '未知标题',
+          poster: _selectedVideo?.pic ?? widget.poster,
+          connectedDevice: device,
+          onCastStopped: () {
+            _onCastStopped();
+          },
+        ),
+      ),
+    );
+    setState(() {
+      _isCasting = true;
+    });
+  }
+
+  void _onCastStopped() {
+    setState(() {
+      _isCasting = false;
+    });
   }
 }

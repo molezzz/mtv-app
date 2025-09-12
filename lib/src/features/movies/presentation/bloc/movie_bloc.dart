@@ -243,4 +243,14 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
           MovieError(message: 'Failed to fetch video detail: ${e.toString()}'));
     }
   }
+
+  Future<dynamic> getVideoDetailForCasting(String source, String id) async {
+    try {
+      final videoDetail = await getVideoDetail(source, id);
+      return videoDetail;
+    } catch (e) {
+      // You might want to handle this error more gracefully
+      rethrow;
+    }
+  }
 }

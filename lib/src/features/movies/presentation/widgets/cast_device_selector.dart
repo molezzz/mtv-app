@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtv_app/src/core/services/cast_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class CastDeviceSelector extends StatefulWidget {
   final String videoUrl;
@@ -73,11 +74,14 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('初始化投屏失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // 修改这里：使用Fluttertoast显示错误信息在顶部
+        Fluttertoast.showToast(
+          msg: "初始化投屏失败: $e",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     }
@@ -106,11 +110,14 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
             widget.onDeviceConnected?.call(device);
 
             Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('已投屏到 ${device.name}'),
-                backgroundColor: Colors.green,
-              ),
+            // 修改这里：使用Fluttertoast显示成功信息在顶部
+            Fluttertoast.showToast(
+              msg: '已投屏到 ${device.name}',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.TOP,
+              backgroundColor: Colors.green,
+              textColor: Colors.white,
+              fontSize: 16.0,
             );
           }
         } else {
@@ -121,11 +128,13 @@ class _CastDeviceSelectorState extends State<CastDeviceSelector> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('投屏失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+        Fluttertoast.showToast(
+          msg: "投屏失败: $e",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     } finally {

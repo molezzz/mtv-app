@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mtv_app/src/core/services/cast_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:mtv_app/src/features/movies/presentation/widgets/cast_device_selector.dart';
 
 class CastControlPage extends StatefulWidget {
@@ -76,11 +77,14 @@ class _CastControlPageState extends State<CastControlPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('操作失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // 使用Fluttertoast显示错误信息在顶部
+        Fluttertoast.showToast(
+          msg: "操作失败: $e",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     } finally {
@@ -102,20 +106,26 @@ class _CastControlPageState extends State<CastControlPage> {
       if (mounted) {
         widget.onCastStopped?.call();
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已停止投屏'),
-            backgroundColor: Colors.green,
-          ),
+        // 使用Fluttertoast显示成功信息在顶部
+        Fluttertoast.showToast(
+          msg: "已停止投屏",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('停止投屏失败: $e'),
-            backgroundColor: Colors.red,
-          ),
+        // 使用Fluttertoast显示错误信息在顶部
+        Fluttertoast.showToast(
+          msg: "停止投屏失败: $e",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 16.0,
         );
       }
     } finally {
