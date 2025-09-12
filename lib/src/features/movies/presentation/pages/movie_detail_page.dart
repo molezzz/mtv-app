@@ -637,31 +637,79 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: const Text('请选择操作', style: TextStyle(color: Colors.white)),
-          content: Text(
-              '您想如何播放: ${source.sourceName ?? source.source ?? '未知源'}?',
-              style: TextStyle(color: Colors.grey[300])),
-          actionsAlignment: MainAxisAlignment.spaceEvenly,
+          title: const Text('请选择操作',
+              style: TextStyle(color: Colors.white), textAlign: TextAlign.center),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 30.0, horizontal: 20.0),
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: <Widget>[
+              _buildDialogButton(
+                context,
+                icon: Icons.tv,
+                label: '投屏',
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close the dialog
+                  _showDevicePicker();
+                },
+              ),
+              _buildDialogButton(
+                context,
+                icon: Icons.play_arrow,
+                label: '直接播放',
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close the dialog
+                  _playVideo(source, index);
+                },
+              ),
+            ],
+          ),
           actions: <Widget>[
             TextButton(
-              child: const Text('投屏',
-                  style: TextStyle(color: Colors.orange, fontSize: 16)),
+              child: const Text('取消', style: TextStyle(color: Colors.grey)),
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                _showDevicePicker(); // This existing method uses _selectedVideo, which is already set
+                Navigator.of(context).pop();
               },
-            ),
-            TextButton(
-              child: const Text('直接播放',
-                  style: TextStyle(color: Colors.orange, fontSize: 16)),
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                _playVideo(source, index); // Call the existing play method
-              },
-            ),
+            )
           ],
+          actionsAlignment: MainAxisAlignment.center,
         );
       },
+    );
+  }
+
+  Widget _buildDialogButton(BuildContext context,
+      {required IconData icon,
+      required String label,
+      required VoidCallback onPressed}) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 3,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.orange, size: 48),
+            const SizedBox(height: 8),
+            Text(label,
+                style: const TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+      ),
     );
   }
 
